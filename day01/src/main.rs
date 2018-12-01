@@ -13,9 +13,9 @@ fn main() -> Result<(), Error> {
     states.insert(0);
     let mut count = 0;
     for (idx, line) in lines.iter().cycle().enumerate() {
-        count = idx;
         sum += line;
         if states.contains(&sum) {
+            count = idx;
             break;
         }
         states.insert(sum);
