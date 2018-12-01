@@ -11,13 +11,15 @@ fn main() -> Result<(), Error> {
     let mut sum: i32 = 0;
     let mut states = HashSet::new();
     states.insert(0);
-    for line in lines.iter().cycle() {
+    let mut count = 0;
+    for (idx, line) in lines.iter().cycle().enumerate() {
+        count = idx;
         sum += line;
         if states.contains(&sum) {
             break;
         }
         states.insert(sum);
     }
-    println!("first duplicate: {}", sum);
+    println!("first duplicate: {} (idx: {})", sum, count);
     Ok(())
 }
