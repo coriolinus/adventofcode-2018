@@ -1,0 +1,9 @@
+[package]
+name = "day03"
+version = "0.1.0"
+authors = ["Peter Goodspeed-Niklaus <peter.r.goodspeedniklaus@gmail.com>"]
+
+[dependencies]
+day01 = { path = "../day01" }
+failure = "0.1"
+text_io = "0.1"
