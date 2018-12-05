@@ -147,10 +147,10 @@ impl Record {
     }
 }
 
-pub type Minute = u8;
+pub type Minute = u32;
 
 fn minute_of(d: &DateTime) -> Minute {
-    d.time().minute() as u8
+    d.time().minute() as Minute
 }
 
 #[derive(Default)]
