@@ -1,71 +1,36 @@
 extern crate failure;
-extern crate intrusive_collections;
-
-pub mod polymer;
 
 use failure::{format_err, Error};
-use polymer::Polymer;
 
-pub fn react(p: &mut Polymer) {
-    #[cfg(debug_assertions)]
-    println!("reacting: {}", polymer::to_string(p));
+pub type Polymer = String;
 
-    let mut cursor = p.cursor_mut();
-
-    loop {
-        cursor.move_next();
-        if cursor.is_null() {
-            break;
-        }
-
-        let mut reacts = false;
-        {
-            let current = cursor.get().unwrap().value;
-
-            #[cfg(debug_assertions)]
-            print!("current, next: {}, ", current);
-
-            if let Some(next) = cursor.peek_next().get() {
-                let next = next.value;
-
-                #[cfg(debug_assertions)]
-                print!("{} ", next);
-
-                if current != next && current.eq_ignore_ascii_case(&next) {
-                    reacts = true;
-                }
+pub fn build_react(s: &str) -> Polymer {
+    let mut v = Vec::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        if v.is_empty() {
+            v.push(b);
+        } else {
+            let terminal = v[v.len() - 1];
+            if terminal != b && terminal.eq_ignore_ascii_case(&b) {
+                v.pop();
             } else {
-                #[cfg(debug_assertions)]
-                print!("None ");
+                v.push(b);
             }
-        }
-
-        #[cfg(debug_assertions)]
-        println!("({})", reacts);
-
-        if reacts {
-            cursor.remove();
-            cursor.remove();
-            // move back two steps so we're at the character before the two removed ones
-            cursor.move_prev();
-            // but don't move past the beginning
-            if cursor.is_null() {
-                cursor.move_next();
-            }
-            cursor.move_prev();
         }
     }
+
+    Polymer::from_utf8(v).expect("reaction should not destroy ascii-ness")
 }
 
 fn trim_react(trim: u8, input: &str) -> Result<String, Error> {
     let trim = trim as u8;
-    let input: Vec<_> = input
-        .bytes()
-        .filter(|b| !b.eq_ignore_ascii_case(&trim))
-        .collect();
-    let mut p = polymer::new(&String::from_utf8(input)?);
-    react(&mut p);
-    Ok(polymer::to_string(&p))
+    let input = String::from_utf8(
+        input
+            .bytes()
+            .filter(|b| !b.eq_ignore_ascii_case(&trim))
+            .collect(),
+    )?;
+    Ok(build_react(&input))
 }
 
 pub fn min_trim_reaction(input: &str) -> Result<String, Error> {
@@ -92,9 +57,7 @@ mod test {
         ($name:ident($example:expr, $expect:expr)) => {
             #[test]
             fn $name() {
-                let mut p = polymer::new($example);
-                react(&mut p);
-                let result = polymer::to_string(&p);
+                let result = build_react($example);
                 assert_eq!($expect, result);
             }
         };

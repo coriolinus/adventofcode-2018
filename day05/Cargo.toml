@@ -5,5 +5,4 @@ authors = ["Peter Goodspeed-Niklaus <peter.r.goodspeedniklaus@gmail.com>"]
 
 [dependencies]
 failure = "0.1"
-intrusive-collections = "0.7.8"
 util = { path = "../util" }
