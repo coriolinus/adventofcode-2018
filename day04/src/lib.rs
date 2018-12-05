@@ -145,6 +145,21 @@ impl Record {
             .max()
             .map(|(_, &minute)| minute)
     }
+
+    pub fn consistent_sleep(records: &[Self]) -> Option<(Guard, Minute)> {
+        let mut sleepmap: HashMap<(Guard, Minute), u32> = HashMap::new();
+        for (guard, moment) in Record::sleep_minutes(records)? {
+            let minute = minute_of(&moment);
+            *sleepmap.entry((guard, minute)).or_default() += 1;
+        }
+
+        // find max
+        sleepmap
+            .iter()
+            .map(|(gmpair, count): (&(Guard, Minute), &u32)| (count, gmpair))
+            .max()
+            .map(|(_, &(guard, minute))| (guard, minute))
+    }
 }
 
 pub type Minute = u32;

@@ -15,5 +15,8 @@ fn main() -> Result<(), Error> {
     println!("Sleepiest minute: {}", sm);
     let product = mma_guard as u32 * sm as u32;
     println!("Product: {}", product);
+    let (dozer, when) = Record::consistent_sleep(&records).expect("it has to be someone");
+    println!("Consistency: guard #{} is asleep at minute {} more often than anyone else", dozer, when);
+    println!("Product: {}", dozer * when);
     Ok(())
 }
