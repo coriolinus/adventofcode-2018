@@ -1,20 +1,24 @@
 extern crate failure;
 
-use failure::{Fail, Error};
+use failure::{Error, Fail};
 use std::env::args;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::str::FromStr;
 
 pub fn get_input_path() -> String {
-    args()
-        .skip(1)
-        .next()
-        .unwrap_or(String::from("input.txt"))
+    args().skip(1).next().unwrap_or(String::from("input.txt"))
 }
 
 pub fn get_input() -> Result<BufReader<File>, Error> {
     Ok(BufReader::new(File::open(get_input_path())?))
+}
+
+pub fn get_input_string() -> Result<String, Error> {
+    let mut reader = get_input()?;
+    let mut out = String::new();
+    let _ = reader.read_to_string(&mut out)?;
+    Ok(out)
 }
 
 pub fn get_input_lines() -> Result<Vec<String>, Error> {
