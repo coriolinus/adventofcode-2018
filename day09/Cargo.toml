@@ -1,0 +1,8 @@
+[package]
+name = "day09"
+version = "0.1.0"
+authors = ["Peter Goodspeed-Niklaus <peter.r.goodspeedniklaus@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+slab = "0.4"
