@@ -75,6 +75,13 @@ impl<T> Circle<T> {
         }
     }
 
+    pub fn with_capacity(capacity: usize) -> Circle<T> {
+        Circle {
+            slab: Slab::with_capacity(capacity),
+            ..Circle::new()
+        }
+    }
+
     // Inserts a new element at the back of the list.
     pub fn push_back(&mut self, t: T) -> Pointer {
         self.size += 1;

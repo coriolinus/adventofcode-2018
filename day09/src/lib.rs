@@ -16,7 +16,7 @@ pub struct State {
 impl State {
     pub fn new(players: usize, last_marble: u32) -> State {
         // preload the first two steps, which are confusing anyway.
-        let mut circle = Circle::new();
+        let mut circle = Circle::with_capacity(last_marble as usize);
         circle.push_back(0);
         circle.push_back(1);
 
