@@ -1,8 +1,42 @@
-pub mod circle;
-pub mod cursor;
+use std::collections::VecDeque;
 
-use crate::circle::Circle;
-use crate::cursor::Cursor;
+pub trait Rotate {
+    fn step_left(&mut self);
+    fn step_right(&mut self);
+
+    fn seek(&mut self, steps: isize) {
+        match steps {
+            0 => (),
+            n if n > 0 => {
+                for _ in 0..n {
+                    self.step_right();
+                }
+            }
+            n if n < 0 => {
+                for _ in 0..n.abs() {
+                    self.step_left();
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub type Circle = VecDeque<u32>;
+
+impl Rotate for Circle {
+    fn step_right(&mut self) {
+        if let Some(n) = self.pop_back() {
+            self.push_front(n);
+        }
+    }
+
+    fn step_left(&mut self) {
+        if let Some(n) = self.pop_front() {
+            self.push_back(n);
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct State {
@@ -10,7 +44,7 @@ pub struct State {
     next_marble: u32,
     next_player: usize,
     scores: Vec<u32>,
-    cursor: Cursor<u32>,
+    circle: Circle,
 }
 
 impl State {
@@ -20,15 +54,12 @@ impl State {
         circle.push_back(0);
         circle.push_back(1);
 
-        let mut cursor = Cursor::new(circle);
-        cursor.step_right();
-
         State {
             last_marble,
             next_marble: 2,
             next_player: 2,
             scores: vec![0; players],
-            cursor: cursor,
+            circle,
         }
     }
 
@@ -44,11 +75,11 @@ impl State {
 
         if marble % 23 == 0 {
             self.scores[player] += marble;
-            self.cursor.seek(-7);
-            self.scores[player] += self.cursor.remove();
+            self.circle.seek(-7);
+            self.scores[player] += self.circle.pop_back().unwrap();
         } else {
-            self.cursor.seek(2);
-            self.cursor.insert(marble);
+            self.circle.seek(2);
+            self.circle.push_back(marble);
         }
     }
 
