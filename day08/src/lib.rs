@@ -9,7 +9,7 @@ pub struct Node<'i> {
 }
 
 impl<'i> Node<'i> {
-    pub fn try_parse(mut input: &'i [u8]) -> Option<(Node, &[u8])> {
+    pub fn try_parse(mut input: &'i [u8]) -> Option<(Node<'_>, &[u8])> {
         if input.len() < 2 {
             return None;
         }

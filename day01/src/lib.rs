@@ -1,4 +1,4 @@
-extern crate failure;
+
 
 use failure::{format_err, Error};
 use std::env::args;

@@ -1,6 +1,6 @@
-extern crate day01;
-extern crate day02;
-extern crate failure;
+
+
+
 
 use day01::get_input_lines;
 use day02::{find_almost_match, hash};

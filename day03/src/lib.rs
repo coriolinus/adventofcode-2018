@@ -1,5 +1,5 @@
-extern crate failure;
-extern crate text_io;
+
+use text_io;
 
 use std::str::FromStr;
 use text_io::try_scan;

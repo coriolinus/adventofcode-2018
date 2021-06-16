@@ -1,6 +1,6 @@
-extern crate day05;
-extern crate failure;
-extern crate util;
+
+
+
 
 use day05::{build_react, min_trim_reaction};
 use failure::Error;

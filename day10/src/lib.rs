@@ -30,7 +30,7 @@ impl Add for Vec2 {
 }
 
 impl fmt::Display for Vec2 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<{:2}, {:2}>", self.x, self.y)
     }
 }

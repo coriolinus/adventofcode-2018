@@ -1,6 +1,6 @@
-extern crate day04;
-extern crate failure;
-extern crate util;
+
+
+
 
 use day04::Record;
 use failure::Error;

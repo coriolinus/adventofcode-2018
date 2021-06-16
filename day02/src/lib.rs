@@ -1,5 +1,5 @@
-extern crate counter;
-extern crate itertools;
+
+
 
 use counter::Counter;
 use itertools::Itertools;

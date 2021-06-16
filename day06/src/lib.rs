@@ -1,4 +1,4 @@
-extern crate text_io;
+use text_io;
 
 use std::str::FromStr;
 use text_io::try_scan;
@@ -55,7 +55,7 @@ impl Into<char> for Cell {
 }
 
 impl std::fmt::Display for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", <Self as Into<char>>::into(*self))
     }
 }

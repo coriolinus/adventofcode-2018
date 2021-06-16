@@ -1,9 +1,9 @@
-extern crate chrono;
-extern crate failure;
+use chrono;
+use failure;
 #[macro_use]
 extern crate failure_derive;
-extern crate itertools;
-extern crate text_io;
+
+use text_io;
 
 use chrono::{Duration, NaiveDateTime as DateTime, Timelike};
 use itertools::Itertools;
@@ -40,7 +40,7 @@ impl FromStr for Event {
 }
 
 impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         use crate::Event::*;
         match self {
             FallsAsleep => write!(f, "falls asleep"),
@@ -100,7 +100,7 @@ impl FromStr for Record {
 }
 
 impl Record {
-    pub fn sleep_minutes(records: &[Self]) -> Option<Sleepytime> {
+    pub fn sleep_minutes(records: &[Self]) -> Option<Sleepytime<'_>> {
         // check to see if self is sorted
         for w in records.windows(2) {
             if w[0] > w[1] {

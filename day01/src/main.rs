@@ -1,5 +1,5 @@
-extern crate day01;
-extern crate failure;
+use day01;
+
 
 use failure::Error;
 use std::collections::HashSet;

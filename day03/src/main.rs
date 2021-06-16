@@ -1,6 +1,6 @@
-extern crate day01;
-extern crate day03;
-extern crate failure;
+
+
+
 
 use day01::get_input_lines_as;
 use day03::{apply_claims, Claim, find_uncontended};
