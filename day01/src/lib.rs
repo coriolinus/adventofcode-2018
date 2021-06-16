@@ -1,56 +1,38 @@
+use aoclib::parse;
 
+use std::{collections::HashSet, path::Path};
 
-use failure::{format_err, Error};
-use std::env::args;
-use std::error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::str::FromStr;
+pub type Frequency = i32;
 
-pub fn get_input_path() -> Result<String, Error> {
-    args()
-        .skip(1)
-        .next()
-        .ok_or_else(|| format_err!("must specify input path as first argument"))
+pub fn part1(input: &Path) -> Result<(), Error> {
+    let frequency_sum = parse::<Frequency>(input)?.sum::<Frequency>();
+    println!("frequency sum: {}", frequency_sum);
+    Ok(())
 }
 
-pub fn get_input() -> Result<BufReader<File>, Error> {
-    Ok(BufReader::new(File::open(get_input_path()?)?))
-}
-
-pub fn get_input_lines() -> Result<Vec<String>, Error> {
-    let mut out = Vec::new();
-    for line in get_input()?.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-        out.push(line);
-    }
-
-    Ok(out)
-}
-
-pub fn get_input_lines_as<T>() -> Result<Vec<T>, Error>
-where
-    T: FromStr,
-    <T as FromStr>::Err: 'static + Send + Sync + error::Error,
-{
-    let mut out = Vec::new();
-    for line in get_input()?.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-
-        match line.parse::<T>() {
-            Ok(v) => out.push(v),
-            Err(e) => {
-                eprintln!("unparseable: {}", line);
-                return Err(e.into());
-            }
+pub fn part2(input: &Path) -> Result<(), Error> {
+    let mut states = HashSet::new();
+    states.insert(0);
+    let mut count = 0;
+    let mut sum = 0;
+    for (idx, line) in parse::<Frequency>(input)?
+        .collect::<Vec<_>>()
+        .into_iter()
+        .cycle()
+        .enumerate()
+    {
+        sum += line;
+        if !states.insert(sum) {
+            count = idx;
+            break;
         }
     }
+    println!("first duplicate: {} (idx: {})", sum, count);
+    Ok(())
+}
 
-    Ok(out)
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }

@@ -1,25 +1,53 @@
-use day01;
+use aoclib::{config::Config, website::get_input};
+use day01::{part1, part2};
 
+use color_eyre::eyre::Result;
+use structopt::StructOpt;
+use std::path::PathBuf;
 
-use failure::Error;
-use std::collections::HashSet;
+const YEAR: u32 = 2018;
+const DAY: u8 = 1;
 
-fn main() -> Result<(), Error> {
-    let lines: Vec<i32> = day01::get_input_lines_as()?;
-    println!("sum: {}", lines.iter().sum::<i32>());
+#[derive(StructOpt, Debug)]
+struct RunArgs {
+    /// input file
+    #[structopt(long, parse(from_os_str))]
+    input: Option<PathBuf>,
 
-    let mut sum: i32 = 0;
-    let mut states = HashSet::new();
-    states.insert(0);
-    let mut count = 0;
-    for (idx, line) in lines.iter().cycle().enumerate() {
-        sum += line;
-        if states.contains(&sum) {
-            count = idx;
-            break;
+    /// skip part 1
+    #[structopt(long)]
+    no_part1: bool,
+
+    /// run part 2
+    #[structopt(long)]
+    part2: bool,
+}
+
+impl RunArgs {
+    fn input(&self) -> Result<PathBuf> {
+        match self.input {
+            None => {
+                let config = Config::load()?;
+                // this does nothing if the input file already exists, but
+                // simplifies the workflow after cloning the repo on a new computer
+                get_input(&config, YEAR, DAY)?;
+                Ok(config.input_for(YEAR, DAY))
+            }
+            Some(ref path) => Ok(path.clone()),
         }
-        states.insert(sum);
     }
-    println!("first duplicate: {} (idx: {})", sum, count);
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let args = RunArgs::from_args();
+    let input_path = args.input()?;
+
+    if !args.no_part1 {
+        part1(&input_path)?;
+    }
+    if args.part2 {
+        part2(&input_path)?;
+    }
     Ok(())
 }
