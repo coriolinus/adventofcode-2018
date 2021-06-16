@@ -13,21 +13,25 @@ pub fn part1(input: &Path) -> Result<(), Error> {
 pub fn part2(input: &Path) -> Result<(), Error> {
     let mut states = HashSet::new();
     states.insert(0);
-    let mut count = 0;
-    let mut sum = 0;
+    let mut accumulated = 0;
+    let mut count = None;
+
     for (idx, line) in parse::<Frequency>(input)?
         .collect::<Vec<_>>()
         .into_iter()
         .cycle()
         .enumerate()
     {
-        sum += line;
-        if !states.insert(sum) {
-            count = idx;
+        accumulated += line;
+        if !states.insert(accumulated) {
+            count = Some(idx);
             break;
         }
     }
-    println!("first duplicate: {} (idx: {})", sum, count);
+
+    let count = count.ok_or(Error::NoSolution)?;
+
+    println!("first duplicate: {} (idx: {})", accumulated, count);
     Ok(())
 }
 
@@ -35,4 +39,6 @@ pub fn part2(input: &Path) -> Result<(), Error> {
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("no solution found")]
+    NoSolution,
 }
