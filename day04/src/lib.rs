@@ -26,7 +26,7 @@ impl FromStr for Event {
     type Err = text_io::Error;
 
     fn from_str(s: &str) -> Result<Event, Self::Err> {
-        use Event::*;
+        use crate::Event::*;
         match s {
             "falls asleep" => Ok(FallsAsleep),
             "wakes up" => Ok(WakesUp),
@@ -41,7 +41,7 @@ impl FromStr for Event {
 
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        use Event::*;
+        use crate::Event::*;
         match self {
             FallsAsleep => write!(f, "falls asleep"),
             WakesUp => write!(f, "wakes up"),
@@ -237,7 +237,7 @@ impl Record {
             .unwrap()
             .group_by(|(g, m)| (g.clone(), m.format("%m-%d").to_string()))
         {
-            write!(w, "{:6} #{:4} ", date, guard);
+            write!(w, "{:6} #{:4} ", date, guard).unwrap();
 
             use itertools::EitherOrBoth::{Both, Left, Right};
             for c in moments
@@ -247,9 +247,9 @@ impl Record {
                     Right(_) => '.',
                     Both(_, _) => '#',
                 }) {
-                write!(w, "{}", c);
+                write!(w, "{}", c).unwrap();
             }
-            writeln!(w, "");
+            writeln!(w, "").unwrap();
         }
     }
 }
