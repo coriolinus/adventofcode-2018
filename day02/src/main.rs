@@ -1,5 +1,5 @@
 use aoclib::{config::Config, website::get_input};
-use day02::{part1, part2, part2_mode2};
+use day02::{part1, part2};
 
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
@@ -21,10 +21,6 @@ struct RunArgs {
     /// run part 2
     #[structopt(long)]
     part2: bool,
-
-    /// run part 2 mode 2
-    #[structopt(long)]
-    part2_mode2: bool,
 }
 
 impl RunArgs {
@@ -52,9 +48,6 @@ fn main() -> Result<()> {
     }
     if args.part2 {
         part2(&input_path)?;
-    }
-    if args.part2_mode2 {
-        part2_mode2(&input_path)?;
     }
     Ok(())
 }

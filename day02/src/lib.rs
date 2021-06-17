@@ -37,7 +37,8 @@ pub fn hamming(a: &str, b: &str) -> usize {
 }
 
 // This variant of the function iterates over each string twice, but only
-// allocates when there's a known match.
+// allocates when there's a known match. That turns out to be more performant
+// than an implementation which iterates only once but allocates as it goes.
 pub fn find_almost_match<S>(strings: &[S]) -> Option<String>
 where
     S: AsRef<str>,
@@ -56,37 +57,6 @@ where
         })
 }
 
-/// The elements common to `a` and `b` if there is only one difference
-pub fn almost_match((a, b): (&str, &str)) -> Option<String> {
-    let mut diffs = 0;
-    let common = a
-        .chars()
-        .zip(b.chars())
-        .filter_map(|(a, b)| {
-            if a == b {
-                Some(a)
-            } else {
-                diffs += 1;
-                None
-            }
-        })
-        .collect();
-    (diffs == 1).then(move || common)
-}
-
-// This variant of the function iterates over each string only once,
-// but builds up the common elements into a new string each time.
-pub fn find_almost_match_mode_2<S>(strings: &[S]) -> Option<String>
-where
-    S: AsRef<str>,
-{
-    strings
-        .iter()
-        .map(|s| s.as_ref())
-        .tuple_combinations()
-        .find_map(almost_match)
-}
-
 pub fn part1(input: &Path) -> Result<(), Error> {
     let ids: Vec<BoxId> = parse(input)?.collect();
     let checksum =
@@ -101,32 +71,6 @@ pub fn part2(input: &Path) -> Result<(), Error> {
     println!("almost match: {}", almost_match);
     Ok(())
 }
-
-pub fn part2_mode2(input: &Path) -> Result<(), Error> {
-    let ids: Vec<String> = parse(input)?.collect();
-    let almost_match = find_almost_match_mode_2(&ids).ok_or(Error::NoSolution)?;
-    println!("almost match: {}", almost_match);
-    Ok(())
-}
-
-// Hyperfine results comparing part2 basic mode to part2 mode2:
-//
-// Benchmark #1: target/release/day02 --no-part1 --part2
-//   Time (mean ± σ):       1.2 ms ±   0.1 ms    [User: 1.2 ms, System: 0.1 ms]
-//   Range (min … max):     1.1 ms …   1.8 ms    1814 runs
-//
-//   Warning: Command took less than 5 ms to complete. Results might be inaccurate.
-//   Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
-//
-// Benchmark #2: target/release/day02 --no-part1 --part2-mode2
-//   Time (mean ± σ):       1.6 ms ±   0.1 ms    [User: 1.5 ms, System: 0.1 ms]
-//   Range (min … max):     1.4 ms …   2.1 ms    1552 runs
-//
-//   Warning: Command took less than 5 ms to complete. Results might be inaccurate.
-//
-// Summary
-//   'target/release/day02 --no-part1 --part2' ran
-//     1.28 ± 0.09 times faster than 'target/release/day02 --no-part1 --part2-mode2'
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
