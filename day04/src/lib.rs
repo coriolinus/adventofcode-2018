@@ -1,273 +1,149 @@
-use chrono;
-use failure;
-#[macro_use]
-extern crate failure_derive;
+use aoclib::parse;
 
-use text_io;
+use std::{collections::HashMap, path::Path};
 
-use chrono::{Duration, NaiveDateTime as DateTime, Timelike};
-use itertools::Itertools;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::fmt;
-use std::str::FromStr;
-use text_io::try_scan;
+type Id = u32;
 
-pub type Guard = u32;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Event {
-    BeginShift(Guard),
-    FallsAsleep,
-    WakesUp,
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Debug,
+    parse_display::FromStr,
+    parse_display::Display,
+)]
+#[display("{year}-{month}-{day} {hour}:{minute}")]
+struct Timestamp {
+    year: i16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
 }
 
-impl FromStr for Event {
-    type Err = text_io::Error;
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Debug,
+    parse_display::FromStr,
+    parse_display::Display,
+)]
+enum Action {
+    #[display("Guard #{0} begins shift")]
+    BeginShift(Id),
+    #[display("falls asleep")]
+    FallAsleep,
+    #[display("wakes up")]
+    WakeUp,
+}
 
-    fn from_str(s: &str) -> Result<Event, Self::Err> {
-        use crate::Event::*;
-        match s {
-            "falls asleep" => Ok(FallsAsleep),
-            "wakes up" => Ok(WakesUp),
-            s => {
-                let id: u32;
-                try_scan!(s.bytes() => "Guard #{} begins shift", id);
-                Ok(BeginShift(id))
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Debug,
+    parse_display::FromStr,
+    parse_display::Display,
+)]
+#[display("[{timestamp}] {action}")]
+struct LogEntry {
+    timestamp: Timestamp,
+    action: Action,
+}
+
+fn minutes_asleep(logs: &[LogEntry]) -> HashMap<Id, u32> {
+    let mut sleep_time = HashMap::new();
+    let mut guard = None;
+    let mut sleep_start = None;
+
+    for entry in logs {
+        match entry.action {
+            Action::BeginShift(id) => {
+                debug_assert!(sleep_start.is_none());
+                guard = Some(id);
+            }
+            Action::FallAsleep => {
+                debug_assert!(sleep_start.is_none());
+                sleep_start = entry.timestamp.minute.into();
+            }
+            Action::WakeUp => {
+                let sleep_start = sleep_start.take().expect("can't wake if not asleep");
+                let sleep_end = entry.timestamp.minute;
+                *sleep_time
+                    .entry(guard.expect("can't wake if not a guard"))
+                    .or_default() += (sleep_end - sleep_start) as u32;
             }
         }
     }
+
+    sleep_time
 }
 
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        use crate::Event::*;
-        match self {
-            FallsAsleep => write!(f, "falls asleep"),
-            WakesUp => write!(f, "wakes up"),
-            BeginShift(id) => write!(f, "Guard #{} begins shift", id),
-        }
-    }
-}
+fn sleepiest_minute(guard: Id, logs: &[LogEntry]) -> u32 {
+    let mut minutes_slept = [0; 60];
+    let mut on_shift = false;
+    let mut sleep_start = None;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Record {
-    pub timestamp: DateTime,
-    pub event: Event,
-}
-
-impl PartialOrd for Record {
-    fn partial_cmp(&self, other: &Record) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Record {
-    fn cmp(&self, other: &Record) -> Ordering {
-        self.timestamp.cmp(&other.timestamp)
-    }
-}
-
-#[derive(Debug, Fail)]
-pub enum ParseError {
-    #[fail(display = "parsing datetime: {}", _0)]
-    ParseDateTime(#[cause] chrono::format::ParseError),
-    #[fail(display = "parsing event: {}", _0)]
-    ParseEvent(#[cause] text_io::Error),
-}
-
-impl From<chrono::format::ParseError> for ParseError {
-    fn from(err: chrono::format::ParseError) -> ParseError {
-        ParseError::ParseDateTime(err)
-    }
-}
-
-impl From<text_io::Error> for ParseError {
-    fn from(err: text_io::Error) -> ParseError {
-        ParseError::ParseEvent(err)
-    }
-}
-
-impl FromStr for Record {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Record, Self::Err> {
-        // [1518-07-31 00:54] wakes up
-        let timestamp = DateTime::parse_from_str(&s[1..17], "%Y-%m-%d %H:%M")?;
-        let event = Event::from_str(&s[19..])?;
-        Ok(Record { timestamp, event })
-    }
-}
-
-impl Record {
-    pub fn sleep_minutes(records: &[Self]) -> Option<Sleepytime<'_>> {
-        // check to see if self is sorted
-        for w in records.windows(2) {
-            if w[0] > w[1] {
-                return None;
+    for entry in logs {
+        match entry.action {
+            Action::BeginShift(id) => on_shift = id == guard,
+            Action::FallAsleep if on_shift => {
+                debug_assert!(sleep_start.is_none());
+                sleep_start = entry.timestamp.minute.into();
             }
-        }
-
-        Some(Sleepytime {
-            records,
-            ..Sleepytime::default()
-        })
-    }
-
-    pub fn most_minutes_asleep(records: &[Self]) -> Option<Guard> {
-        let mut sleepmap = HashMap::new();
-        for (guard, _) in Record::sleep_minutes(records)? {
-            *sleepmap.entry(guard).or_default() += 1;
-        }
-
-        // find max
-        sleepmap
-            .iter()
-            .map(|(guard, minutes): (&Guard, &Minute)| (minutes, guard))
-            .max()
-            .map(|(_, &g)| g)
-    }
-
-    pub fn most_sleepy_minute(records: &[Self], guard: Guard) -> Option<Minute> {
-        let mut sleepmap = HashMap::new();
-        for moment in
-            Record::sleep_minutes(records)?
-                .filter_map(|(g, m)| if g == guard { Some(m) } else { None })
-        {
-            let minute = minute_of(&moment);
-            *sleepmap.entry(minute).or_default() += 1;
-        }
-
-        // find max
-        sleepmap
-            .iter()
-            .map(|(minute, count): (&Minute, &usize)| (count, minute))
-            .max()
-            .map(|(_, &minute)| minute)
-    }
-
-    pub fn consistent_sleep(records: &[Self]) -> Option<(Guard, Minute)> {
-        let mut sleepmap: HashMap<(Guard, Minute), u32> = HashMap::new();
-        for (guard, moment) in Record::sleep_minutes(records)? {
-            let minute = minute_of(&moment);
-            *sleepmap.entry((guard, minute)).or_default() += 1;
-        }
-
-        // find max
-        sleepmap
-            .iter()
-            .map(|(gmpair, count): (&(Guard, Minute), &u32)| (count, gmpair))
-            .max()
-            .map(|(_, &(guard, minute))| (guard, minute))
-    }
-}
-
-pub type Minute = u32;
-
-fn minute_of(d: &DateTime) -> Minute {
-    d.time().minute() as Minute
-}
-
-#[derive(Default)]
-pub struct Sleepytime<'a> {
-    records: &'a [Record],
-    record_idx: usize,
-    guard: Option<Guard>,
-    moment: Option<DateTime>,
-}
-
-impl<'a> Iterator for Sleepytime<'a> {
-    type Item = (Guard, DateTime);
-
-    fn next(&mut self) -> Option<(Guard, DateTime)> {
-        loop {
-            if self.record_idx >= self.records.len() {
-                return None;
-            }
-            match self.records[self.record_idx] {
-                Record {
-                    event: Event::BeginShift(guard),
-                    ..
-                } => {
-                    if self.guard.is_some() && self.moment.is_some() {
-                        panic!("guard {:?} never woke up", self.guard);
-                    }
-                    self.guard = Some(guard);
-                }
-                Record {
-                    timestamp,
-                    event: Event::FallsAsleep,
-                } => self.moment = Some(timestamp),
-                Record {
-                    timestamp,
-                    event: Event::WakesUp,
-                } => {
-                    // this is where actual iteration happens
-                    let guard = self
-                        .guard
-                        .expect("malformed input: no shift change before wakeup");
-                    let moment = self
-                        .moment
-                        .expect("malformed input: didn't sleep before wakeup");
-
-                    if moment < timestamp {
-                        let minute = moment.clone();
-                        self.moment = Some(moment + Duration::minutes(1));
-                        return Some((guard, minute));
-                    } else {
-                        self.moment = None;
-                    }
+            Action::WakeUp if on_shift => {
+                let sleep_start = sleep_start.take().expect("can't wake if not asleep");
+                let sleep_end = entry.timestamp.minute;
+                for minute in sleep_start..sleep_end {
+                    minutes_slept[minute as usize] += 1;
                 }
             }
-            self.record_idx += 1;
+            _ => {}
         }
     }
+
+    std::array::IntoIter::new(minutes_slept)
+        .enumerate()
+        .map(|(idx, time_slept)| (time_slept, idx))
+        .max()
+        .map(|(_, idx)| idx as u32)
+        .unwrap()
 }
 
-const DBG_HEADER: &str = "\
-Date   ID    Minute
-             000000000011111111112222222222333333333344444444445555555555
-             012345678901234567890123456789012345678901234567890123456789\
-";
+pub fn part1(input: &Path) -> Result<(), Error> {
+    let mut logs: Vec<LogEntry> = parse(input)?.collect();
+    logs.sort_unstable();
 
-impl Record {
-    pub fn debug<W: std::io::Write>(w: &mut W, records: &[Self]) {
-        writeln!(w, "{}", DBG_HEADER).unwrap();
-        for ((guard, date), moments) in &Record::sleep_minutes(records)
-            .unwrap()
-            .group_by(|(g, m)| (g.clone(), m.format("%m-%d").to_string()))
-        {
-            write!(w, "{:6} #{:4} ", date, guard).unwrap();
-
-            use itertools::EitherOrBoth::{Both, Left, Right};
-            for c in moments
-                .merge_join_by(0..60, |i, j| minute_of(&i.1).cmp(j))
-                .map(|either| match either {
-                    Left(_) => unreachable!(),
-                    Right(_) => '.',
-                    Both(_, _) => '#',
-                }) {
-                write!(w, "{}", c).unwrap();
-            }
-            writeln!(w, "").unwrap();
-        }
-    }
+    let sleep_times = minutes_asleep(&logs);
+    let sleepiest_guard = sleep_times
+        .iter()
+        .map(|(&id, &slept)| (slept, id))
+        .max()
+        .map(|(_, id)| id)
+        .ok_or(Error::NoSolution)?;
+    let sleepiest_minute = sleepiest_minute(sleepiest_guard, &logs);
+    dbg!(sleepiest_guard, sleepiest_minute, sleepiest_guard * sleepiest_minute);
+    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub fn part2(_input: &Path) -> Result<(), Error> {
+    unimplemented!()
+}
 
-    #[test]
-    fn parse_record() {
-        let example = "[1518-07-31 00:54] wakes up";
-        let expect = Record {
-            timestamp: DateTime::parse_from_str("1518-07-31 00:54", "%Y-%m-%d %H:%M").unwrap(),
-            event: Event::WakesUp,
-        };
-        assert_eq!(
-            expect,
-            Record::from_str(example).expect("record parse must succeed")
-        );
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("No solution found")]
+    NoSolution,
 }
