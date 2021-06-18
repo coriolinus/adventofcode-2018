@@ -1,61 +1,58 @@
+use aoclib::{geometry::Point, parse};
+use std::path::Path;
 
-use text_io;
+type Map = aoclib::geometry::Map<Vec<u32>>;
 
-use std::str::FromStr;
-use text_io::try_scan;
-
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Claim {
-    id: usize,
-    offset: (u32, u32),
-    rect: (u32, u32),
+#[derive(Debug, Clone, Copy, parse_display::Display, parse_display::FromStr)]
+#[display("#{id} @ {x},{y}: {width}x{height}")]
+struct Claim {
+    id: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
 }
 
-impl FromStr for Claim {
-    type Err = text_io::Error;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let mut claim = Claim::default();
-        // #123 @ 3,2: 5x4
-        try_scan!(input.bytes() => "#{} @ {},{}: {}x{}", claim.id, claim.offset.0, claim.offset.1, claim.rect.0, claim.rect.1);
-        Ok(claim)
+impl Claim {
+    fn iter_points(&self) -> impl '_ + Iterator<Item = Point> {
+        (self.y..self.y + self.height).flat_map(move |y| {
+            (self.x..self.x + self.width).map(move |x| Point::new(x as i32, y as i32))
+        })
     }
 }
 
-const EDGE: usize = 1000;
-pub type Field = [[u8; EDGE]; EDGE];
-
-pub fn apply_claims(claims: &[Claim]) -> Field {
-    let mut field = [[0_u8; EDGE]; EDGE];
-
-    for claim in claims {
-        for x in (claim.offset.0)..(claim.offset.0 + claim.rect.0) {
-            let x = x as usize;
-            for y in (claim.offset.1)..(claim.offset.1 + claim.rect.1) {
-                let y = y as usize;
-                field[y][x] = field[y][x].saturating_add(1);
-            }
+pub fn part1(input: &Path) -> Result<(), Error> {
+    let mut map = Map::new(1024, 1024);
+    for claim in parse::<Claim>(input)? {
+        for point in claim.iter_points() {
+            map[point].push(claim.id);
         }
     }
-
-    field
+    let n_overlaps = map.iter().filter(|used| used.len() > 1).count();
+    println!("num overlaps: {}", n_overlaps);
+    Ok(())
 }
 
-pub fn find_uncontended(claims: &[Claim], field: &Field) -> usize {
-    // the uncontended claim is the one for which all values in the field are 1
-
-    'claims: for claim in claims {
-        for x in (claim.offset.0)..(claim.offset.0 + claim.rect.0) {
-            let x = x as usize;
-            for y in (claim.offset.1)..(claim.offset.1 + claim.rect.1) {
-                let y = y as usize;
-                if field[y][x] != 1 {
-                    continue 'claims;
-                }
-            }
+pub fn part2(input: &Path) -> Result<(), Error> {
+    let mut map = Map::new(1024, 1024);
+    let claims: Vec<Claim> = parse(input)?.collect();
+    for claim in claims.iter() {
+        for point in claim.iter_points() {
+            map[point].push(claim.id);
         }
-        // if we get here, we found the non-overlapped claim
-        return claim.id
     }
-    0
+    let non_overlapping = claims
+        .iter()
+        .find(|claim| claim.iter_points().all(|point| map[point].len() == 1))
+        .ok_or(Error::NoSolution)?;
+    println!("non overlapping claim: {}", non_overlapping.id);
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("no solution found")]
+    NoSolution,
 }

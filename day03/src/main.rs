@@ -1,21 +1,53 @@
+use aoclib::{config::Config, website::get_input};
+use day03::{part1, part2};
 
+use color_eyre::eyre::Result;
+use structopt::StructOpt;
+use std::path::PathBuf;
 
+const YEAR: u32 = 2018;
+const DAY: u8 = 3;
 
+#[derive(StructOpt, Debug)]
+struct RunArgs {
+    /// input file
+    #[structopt(long, parse(from_os_str))]
+    input: Option<PathBuf>,
 
-use day01::get_input_lines_as;
-use day03::{apply_claims, Claim, find_uncontended};
-use failure::Error;
+    /// skip part 1
+    #[structopt(long)]
+    no_part1: bool,
 
-fn main() -> Result<(), Error> {
-    let lines = get_input_lines_as::<Claim>()?;
-    println!("parsed {} input lines", lines.len());
+    /// run part 2
+    #[structopt(long)]
+    part2: bool,
+}
 
-    let field = apply_claims(&lines);
-    let contended: usize = field
-        .iter()
-        .map(|row| row.iter().filter(|x| x > &&1).count())
-        .sum();
-    println!("{} sq inches contended", contended);
-    println!("uncontended claim: {}", find_uncontended(&lines, &field));
+impl RunArgs {
+    fn input(&self) -> Result<PathBuf> {
+        match self.input {
+            None => {
+                let config = Config::load()?;
+                // this does nothing if the input file already exists, but
+                // simplifies the workflow after cloning the repo on a new computer
+                get_input(&config, YEAR, DAY)?;
+                Ok(config.input_for(YEAR, DAY))
+            }
+            Some(ref path) => Ok(path.clone()),
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let args = RunArgs::from_args();
+    let input_path = args.input()?;
+
+    if !args.no_part1 {
+        part1(&input_path)?;
+    }
+    if args.part2 {
+        part2(&input_path)?;
+    }
     Ok(())
 }
