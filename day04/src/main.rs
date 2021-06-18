@@ -2,8 +2,8 @@ use aoclib::{config::Config, website::get_input};
 use day04::{part1, part2};
 
 use color_eyre::eyre::Result;
-use structopt::StructOpt;
 use std::path::PathBuf;
+use structopt::StructOpt;
 
 const YEAR: u32 = 2018;
 const DAY: u8 = 4;
