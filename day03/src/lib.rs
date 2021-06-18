@@ -1,9 +1,10 @@
 use aoclib::{geometry::Point, parse};
-use std::path::Path;
+use std::{borrow::Borrow, path::Path};
 
-type Map = aoclib::geometry::Map<Vec<u32>>;
+type Map = aoclib::geometry::Map<u32>;
+const EDGE: usize = 1000;
 
-#[derive(Debug, Clone, Copy, parse_display::Display, parse_display::FromStr)]
+#[derive(Debug, Clone, parse_display::Display, parse_display::FromStr)]
 #[display("#{id} @ {x},{y}: {width}x{height}")]
 struct Claim {
     id: u32,
@@ -21,29 +22,33 @@ impl Claim {
     }
 }
 
-pub fn part1(input: &Path) -> Result<(), Error> {
-    let mut map = Map::new(1024, 1024);
-    for claim in parse::<Claim>(input)? {
-        for point in claim.iter_points() {
-            map[point].push(claim.id);
+fn make_map<I, B>(claims: I) -> Map
+where
+    I: IntoIterator<Item = B>,
+    B: Borrow<Claim>,
+{
+    let mut map = Map::new(EDGE, EDGE);
+    for claim in claims {
+        for point in claim.borrow().iter_points() {
+            map[point] += 1;
         }
     }
-    let n_overlaps = map.iter().filter(|used| used.len() > 1).count();
+    map
+}
+
+pub fn part1(input: &Path) -> Result<(), Error> {
+    let map = make_map(parse::<Claim>(input)?);
+    let n_overlaps = map.iter().filter(|&&used| used > 1).count();
     println!("num overlaps: {}", n_overlaps);
     Ok(())
 }
 
 pub fn part2(input: &Path) -> Result<(), Error> {
-    let mut map = Map::new(1024, 1024);
     let claims: Vec<Claim> = parse(input)?.collect();
-    for claim in claims.iter() {
-        for point in claim.iter_points() {
-            map[point].push(claim.id);
-        }
-    }
+    let map = make_map(&claims);
     let non_overlapping = claims
         .iter()
-        .find(|claim| claim.iter_points().all(|point| map[point].len() == 1))
+        .find(|claim| claim.iter_points().all(|point| map[point] == 1))
         .ok_or(Error::NoSolution)?;
     println!("non overlapping claim: {}", non_overlapping.id);
     Ok(())
