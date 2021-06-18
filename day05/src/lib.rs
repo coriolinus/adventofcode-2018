@@ -1,52 +1,71 @@
+use aoclib::{data_structures::linked_list::LinkedList, parse};
+use std::{path::Path, string::FromUtf8Error};
 
+fn reacts(a: u8, b: u8) -> bool {
+    debug_assert!(a.is_ascii_alphabetic());
+    debug_assert!(b.is_ascii_alphabetic());
+    a != b && a.eq_ignore_ascii_case(&b)
+}
 
-use failure::{format_err, Error};
+fn react_to_completion(data: impl IntoIterator<Item = u8>) -> Vec<u8> {
+    let mut list: LinkedList<_> = data.into_iter().collect();
 
-pub type Polymer = String;
+    // keep looping through the list as long as the length keeps changing
+    let mut len_before = !0;
+    while len_before != list.len() {
+        len_before = list.len();
+        let mut cursor = list.cursor_front();
 
-pub fn build_react(s: &str) -> Polymer {
-    let mut v = Vec::with_capacity(s.len());
-    for &b in s.as_bytes() {
-        if v.is_empty() {
-            v.push(b);
-        } else {
-            let terminal = v[v.len() - 1];
-            if terminal != b && terminal.eq_ignore_ascii_case(&b) {
-                v.pop();
-            } else {
-                v.push(b);
+        // for each cursor position, if there is a match with the successor,
+        // clear this position and the next
+        loop {
+            match (cursor.elem().copied(), cursor.peek_next().copied()) {
+                (Some(elem), Some(next)) if reacts(elem, next) => {
+                    dbg!(elem as char, next as char);
+                    // clear the members of the reaction
+                    // taking moves the cursor forward if possible
+                    cursor.take();
+                    cursor.take();
+                }
+                (Some(_), Some(_)) => {
+                    // these aren't reactive chemicals, advance the cursor
+                    dbg!(cursor.advance().map(|byte| *byte as char));
+                }
+                _ => {
+                    // we're at the end of the list
+                    break;
+                }
             }
         }
     }
 
-    Polymer::from_utf8(v).expect("reaction should not destroy ascii-ness")
+    list.iter().copied().collect()
 }
 
-fn trim_react(trim: u8, input: &str) -> Result<String, Error> {
-    let trim = trim as u8;
-    let input = String::from_utf8(
-        input
-            .bytes()
-            .filter(|b| !b.eq_ignore_ascii_case(&trim))
-            .collect(),
-    )?;
-    Ok(build_react(&input))
+fn react_str(polymer: String) -> Result<String, Error> {
+    String::from_utf8(react_to_completion(polymer.as_bytes().iter().copied())).map_err(Into::into)
 }
 
-pub fn min_trim_reaction(input: &str) -> Result<String, Error> {
-    let mut current = None;
-
-    for trim in b'a'..=b'z' {
-        let tr = trim_react(trim, input)?;
-        match current {
-            None => current = Some(tr),
-            Some(c) => {
-                current = Some(if tr.len() < c.len() { tr } else { c });
-            }
-        }
+pub fn part1(input: &Path) -> Result<(), Error> {
+    for (idx, data) in parse::<String>(input)?.enumerate() {
+        let reacted = react_str(data)?;
+        println!("{}: fully reacted len: {}", idx, reacted.len());
     }
+    Ok(())
+}
 
-    current.ok_or_else(|| format_err!("no min found"))
+pub fn part2(_input: &Path) -> Result<(), Error> {
+    unimplemented!()
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("No solution found")]
+    NoSolution,
+    #[error("re-building string from bytes")]
+    FromBytes(#[from] FromUtf8Error),
 }
 
 #[cfg(test)]
@@ -57,7 +76,7 @@ mod test {
         ($name:ident($example:expr, $expect:expr)) => {
             #[test]
             fn $name() {
-                let result = build_react($example);
+                let result = react_str($example.into()).unwrap();
                 assert_eq!($expect, result);
             }
         };

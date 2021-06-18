@@ -1,20 +1,53 @@
+use aoclib::{config::Config, website::get_input};
+use day05::{part1, part2};
 
+use color_eyre::eyre::Result;
+use structopt::StructOpt;
+use std::path::PathBuf;
 
+const YEAR: u32 = 2018;
+const DAY: u8 = 5;
 
+#[derive(StructOpt, Debug)]
+struct RunArgs {
+    /// input file
+    #[structopt(long, parse(from_os_str))]
+    input: Option<PathBuf>,
 
-use day05::{build_react, min_trim_reaction};
-use failure::Error;
-use std::fs::read_to_string;
-use util::get_input_path;
+    /// skip part 1
+    #[structopt(long)]
+    no_part1: bool,
 
-fn main() -> Result<(), Error> {
-    let input = read_to_string(get_input_path())?;
-    let p = build_react(input.trim());
-    println!("len after reaction:            {}", p.len());
-    println!(
-        "min len after trim & reaction: {}",
-        min_trim_reaction(&p)?.len()
-    );
+    /// run part 2
+    #[structopt(long)]
+    part2: bool,
+}
 
+impl RunArgs {
+    fn input(&self) -> Result<PathBuf> {
+        match self.input {
+            None => {
+                let config = Config::load()?;
+                // this does nothing if the input file already exists, but
+                // simplifies the workflow after cloning the repo on a new computer
+                get_input(&config, YEAR, DAY)?;
+                Ok(config.input_for(YEAR, DAY))
+            }
+            Some(ref path) => Ok(path.clone()),
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let args = RunArgs::from_args();
+    let input_path = args.input()?;
+
+    if !args.no_part1 {
+        part1(&input_path)?;
+    }
+    if args.part2 {
+        part2(&input_path)?;
+    }
     Ok(())
 }
