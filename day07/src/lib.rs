@@ -1,9 +1,17 @@
-use std::cmp::Reverse;
-use std::collections::{BTreeSet, BinaryHeap, HashMap};
-use std::str::FromStr;
+use aoclib::parse;
+use std::{
+    cmp::Reverse,
+    collections::{BTreeSet, BinaryHeap, HashMap},
+    path::Path,
+    str::FromStr,
+};
 use text_io::try_scan;
 
 pub type Step = char;
+pub type Seconds = u32;
+
+pub const N_WORKERS: usize = 5;
+pub const TASK_BASE_DURATION: Seconds = 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Edge {
@@ -30,7 +38,7 @@ pub struct Node {
 /// a graph lists, for each step, all of its prerequisites in sorted order
 pub type Graph = HashMap<Step, Node>;
 
-pub fn as_graph(edges: &[Edge]) -> Graph {
+fn make_graph(edges: &[Edge]) -> Graph {
     let mut graph = Graph::new();
 
     for edge in edges {
@@ -49,36 +57,21 @@ pub fn as_graph(edges: &[Edge]) -> Graph {
     graph
 }
 
-pub fn topo_sort(graph: &Graph) -> Vec<Step> {
-    // #[cfg(feature = "debug_out")]
-    // println!("graph: {:#?}", graph);
+fn no_prerequisites(graph: &Graph) -> impl '_ + Iterator<Item = Step> {
+    graph
+        .iter()
+        .filter(|(_step, node)| node.prereq.is_empty())
+        .map(|(&step, _node)| step)
+}
 
-    let mut graph = graph.clone();
+fn topo_sort(mut graph: Graph) -> Vec<Step> {
     let mut out = Vec::with_capacity(graph.len());
 
-    let mut ready: BinaryHeap<_> = graph
-        .iter()
-        .filter_map(|(step, node)| {
-            if node.prereq.is_empty() {
-                Some(Reverse(*step))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    #[cfg(feature = "debug_out")]
-    println!("ready: {:?}", ready);
+    let mut ready: BinaryHeap<_> = no_prerequisites(&graph).map(|step| Reverse(step)).collect();
 
     while let Some(Reverse(step)) = ready.pop() {
-        #[cfg(feature = "debug_out")]
-        print!("pop {}", step);
-
         out.push(step);
         if let Some(node) = graph.remove(&step) {
-            #[cfg(feature = "debug_out")]
-            print!(" blocking {:?}", node.blocked);
-
             for was_blocked in node.blocked {
                 if let Some(wb_node) = graph.get_mut(&was_blocked) {
                     wb_node.prereq.remove(&step);
@@ -88,17 +81,9 @@ pub fn topo_sort(graph: &Graph) -> Vec<Step> {
                 }
             }
         }
-
-        #[cfg(feature = "debug_out")]
-        println!("");
     }
 
     // double-check ourselves
-    #[cfg(feature = "debug_out")]
-    {
-        println!("out:   {:?}", out);
-        println!("graph: {:#?}", graph);
-    }
     debug_assert!(graph.is_empty());
 
     out
@@ -106,16 +91,15 @@ pub fn topo_sort(graph: &Graph) -> Vec<Step> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Event {
-    CompleteTask(u32),    // unblocks a worker
-    Unblocked(u32, Step), // when a task becomes available
+    CompleteTask(Seconds),    // unblocks a worker
+    Unblocked(Seconds, Step), // when a task becomes available
 }
 
 impl Event {
-    fn time(&self) -> u32 {
-        use crate::Event::*;
+    fn time(self) -> Seconds {
         match self {
-            CompleteTask(t) => *t,
-            Unblocked(t, _) => *t,
+            Event::CompleteTask(t) => t,
+            Event::Unblocked(t, _) => t,
         }
     }
 }
@@ -141,69 +125,63 @@ impl PartialOrd for Event {
     }
 }
 
-fn seconds(step: Step) -> u32 {
-    61 + (step as u8 - 'A' as u8) as u32
+fn make_duration_of(duration_base: Seconds) -> impl Fn(Step) -> Seconds {
+    move |step| duration_base + 1 + (step as u8 - 'A' as u8) as Seconds
 }
 
-pub fn assembly_time(graph: &Graph) -> u32 {
-    assembly_time_with(graph, 5, seconds)
+fn assembly_time(graph: Graph) -> Seconds {
+    let duration_of = make_duration_of(TASK_BASE_DURATION);
+    assembly_time_with(graph, N_WORKERS, duration_of)
 }
 
-pub fn assembly_time_with<D>(graph: &Graph, workers: usize, duration: D) -> u32
-where
-    D: Fn(Step) -> u32,
-{
-    let mut graph = graph.clone();
+fn assembly_time_with(
+    mut graph: Graph,
+    workers: usize,
+    duration_of: impl Fn(Step) -> Seconds,
+) -> Seconds {
     let mut time = 0;
     let mut workers_working = 0;
 
-    use crate::Event::*;
-
     // ready: Heap<Event>
-    let mut ready: BinaryHeap<Reverse<Event>> = graph
-        .iter()
-        .filter_map(|(step, node)| {
-            if node.prereq.is_empty() {
-                Some(Reverse(Unblocked(0, *step)))
-            } else {
-                None
-            }
-        })
+    let mut ready: BinaryHeap<_> = no_prerequisites(&graph)
+        .map(|step| Reverse(Event::Unblocked(0, step)))
         .collect();
 
     while let Some(Reverse(event)) = ready.pop() {
         match event {
-            CompleteTask(t) => {
+            Event::CompleteTask(t) => {
                 time = t;
                 workers_working -= 1;
             }
-            Unblocked(t, step) => {
+            Event::Unblocked(t, step) => {
                 time = t;
 
-                if workers_working >= workers {
+                debug_assert!(
+                    workers_working <= workers,
+                    "can't have imaginary workers working"
+                );
+                if workers_working == workers {
                     // no workers available
                     // reset and try again after the next event
-                    let next_time = if let Some(Reverse(event)) = ready.peek() {
-                        event.time()
-                    } else {
-                        // we shouldn't ever hit this branch, but why not, right?
-                        time + 1
-                    };
-                    ready.push(Reverse(Unblocked(next_time, step)));
+                    let Reverse(next_event) = ready
+                        .peek()
+                        .expect("if all workers are occupied, there must be more events");
+                    let next_time = next_event.time();
+                    ready.push(Reverse(Event::Unblocked(next_time, step)));
                     continue;
                 }
 
                 if let Some(node) = graph.remove(&step) {
-                    let finish = time + duration(step);
+                    let finish = time + duration_of(step);
 
                     workers_working += 1;
-                    ready.push(Reverse(CompleteTask(finish)));
+                    ready.push(Reverse(Event::CompleteTask(finish)));
 
                     for was_blocked in node.blocked {
                         if let Some(wb_node) = graph.get_mut(&was_blocked) {
                             wb_node.prereq.remove(&step);
                             if wb_node.prereq.is_empty() {
-                                ready.push(Reverse(Unblocked(finish, was_blocked)));
+                                ready.push(Reverse(Event::Unblocked(finish, was_blocked)));
                             }
                         }
                     }
@@ -213,4 +191,28 @@ where
     }
 
     time
+}
+
+pub fn part1(input: &Path) -> Result<(), Error> {
+    let edges: Vec<Edge> = parse(input)?.collect();
+    let graph = make_graph(&edges);
+    let sorted_steps: String = topo_sort(graph).into_iter().collect();
+
+    println!("instruction order: {}", sorted_steps);
+    Ok(())
+}
+
+pub fn part2(input: &Path) -> Result<(), Error> {
+    let edges: Vec<Edge> = parse(input)?.collect();
+    let graph = make_graph(&edges);
+    let assembly_time = assembly_time(graph);
+
+    println!("assembly time: {}", assembly_time);
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
