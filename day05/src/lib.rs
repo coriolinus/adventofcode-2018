@@ -1,6 +1,6 @@
 use aoclib::parse;
 use bitvec::{bitvec, order::LocalBits};
-use std::{path::Path, string::FromUtf8Error};
+use std::{collections::HashSet, path::Path, string::FromUtf8Error};
 
 fn reacts(a: u8, b: u8) -> bool {
     debug_assert!(a.is_ascii_alphabetic());
@@ -66,6 +66,35 @@ fn react_str(polymer: String) -> Result<String, Error> {
     String::from_utf8(react_to_completion(polymer.as_bytes())).map_err(Into::into)
 }
 
+fn react_completele_excluding(polymer: &[u8], excluding: u8) -> Vec<u8> {
+    let smallymer: Vec<_> = polymer
+        .iter()
+        .copied()
+        .filter(|byte| !excluding.eq_ignore_ascii_case(byte))
+        .collect();
+    react_to_completion(&smallymer)
+}
+
+fn minimal_reaction(polymer: &str) -> Result<String, Error> {
+    let chars: HashSet<_> = polymer
+        .as_bytes()
+        .iter()
+        .filter(|char| char.is_ascii_lowercase())
+        .map(|&char| char as u8)
+        .collect();
+
+    let (_, shortest_reacted_polymer) = chars
+        .into_iter()
+        .map(|excluding| {
+            let reacted = react_completele_excluding(polymer.as_bytes(), excluding);
+            (reacted.len(), reacted)
+        })
+        .min()
+        .unwrap_or_default();
+
+    String::from_utf8(shortest_reacted_polymer).map_err(Into::into)
+}
+
 pub fn part1(input: &Path) -> Result<(), Error> {
     for (idx, data) in parse::<String>(input)?.enumerate() {
         let reacted = react_str(data)?;
@@ -74,8 +103,16 @@ pub fn part1(input: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn part2(_input: &Path) -> Result<(), Error> {
-    unimplemented!()
+pub fn part2(input: &Path) -> Result<(), Error> {
+    for (idx, data) in parse::<String>(input)?.enumerate() {
+        let reacted = minimal_reaction(&data)?;
+        println!(
+            "{}: fully reacted len (excluding a char): {}",
+            idx,
+            reacted.len()
+        );
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
