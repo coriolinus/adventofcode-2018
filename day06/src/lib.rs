@@ -1,254 +1,140 @@
-use text_io;
+mod point;
+mod tile;
 
-use std::str::FromStr;
-use text_io::try_scan;
+use aoclib::geometry::{Direction, Point};
+use point::parse_points;
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
+use tile::Tile;
 
-/// a coordinate pair: `(x, y)`
-#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Coords(usize, usize);
+pub type Map = aoclib::geometry::Map<Tile>;
 
-impl FromStr for Coords {
-    type Err = text_io::Error;
+pub const SAFETY_THRESHOLD: i32 = 10_000;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (x, y): (usize, usize);
-        try_scan!(s.bytes() => "{}, {}", x, y);
-        Ok(Coords(x, y))
+fn make_map(points: &[Point]) -> Map {
+    let mut max_x = 0;
+    let mut max_y = 0;
+    for point in points {
+        max_x = max_x.max(point.x);
+        max_y = max_y.max(point.y);
     }
-}
 
-impl Coords {
-    pub fn manhattan(self, other: Self) -> usize {
-        use std::cmp::{max, min};
+    let mut map = Map::new((max_x + 1) as usize, (max_y + 1) as usize);
 
-        max(self.0, other.0) - min(self.0, other.0) + max(self.1, other.1) - min(self.1, other.1)
+    for (idx, point) in points.iter().copied().enumerate() {
+        map[point] = Tile::Point(idx);
     }
+
+    map
 }
 
-pub type PointID = usize;
+fn fill_map(map: &mut Map, points: &[Point]) -> Result<(), Error> {
+    match points.len() {
+        0 => return Err(Error::NoSolution),
+        1 => map.for_each_mut(|tile| {
+            if !matches!(tile, Tile::Point(_)) {
+                *tile = Tile::Region(0)
+            }
+        }),
+        _ => map.for_each_point_mut(|tile, tile_point| {
+            if *tile == Tile::Empty {
+                let mut distances = Vec::with_capacity(points.len());
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Cell {
-    Empty,
-    Point(PointID),
-    Region(PointID),
-    Equidistant,
-    Safe,
-}
+                for (idx, coord) in points.iter().copied().enumerate() {
+                    distances.push(((tile_point - coord).manhattan(), idx));
+                }
 
-impl Default for Cell {
-    fn default() -> Self {
-        Cell::Empty
+                distances.sort_unstable();
+
+                let (first_dist, idx) = distances[0];
+                let (second_dist, _) = distances[1];
+
+                if first_dist == second_dist {
+                    // the nearest two coordinates are equidistant
+                    *tile = Tile::Equidistant;
+                } else {
+                    // the nearest coordinate is unique
+                    *tile = Tile::Region(idx);
+                }
+            }
+        }),
     }
-}
-
-impl Into<char> for Cell {
-    fn into(self) -> char {
-        match self {
-            Cell::Empty => '∅',
-            Cell::Equidistant => '.',
-            Cell::Point(idx) => (idx as u8 + 'A' as u8) as char,
-            Cell::Region(idx) => (idx as u8 + 'a' as u8) as char,
-            Cell::Safe => '#',
-        }
-    }
-}
-
-impl std::fmt::Display for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", <Self as Into<char>>::into(*self))
-    }
-}
-
-pub type Field = Vec<Vec<Cell>>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Event {
-    Site(PointID),
-    Circle,
-}
-
-pub fn field_debug(f: &Field) -> String {
-    let ss = f
+    debug_assert!(map
         .iter()
-        .map(|row| {
-            row.iter()
-                .map(|&cell| <Cell as Into<char>>::into(cell))
-                .collect::<String>()
+        .all(|&tile| matches!(tile, Tile::Point(_) | Tile::Region(_) | Tile::Equidistant)));
+    Ok(())
+}
+
+fn largest_non_infinite_region(map: &Map) -> Result<usize, Error> {
+    let infinite_regions: HashSet<_> = Direction::iter()
+        .flat_map(|direction| map.edge(direction))
+        .filter_map(|point| match map[point] {
+            Tile::Point(idx) | Tile::Region(idx) => Some(idx),
+            _ => None,
         })
-        .collect::<Vec<_>>();
-    ss.join("\n")
-}
+        .collect();
 
-// naive `n^3` implementation
-fn make_field<Filter, Transform>(
-    points: &[Coords],
-    filter: Filter,
-    transform: Transform,
-) -> Option<Field>
-where
-    Filter: Fn(Cell) -> bool,
-    Transform: Fn(Coords, &[Coords]) -> Cell,
-{
-    if points.is_empty() {
-        return None;
-    }
-    let max_x = points.iter().map(|p| p.0).max()?;
-    let max_y = points.iter().map(|p| p.1).max()?;
-
-    let mut field = vec![vec![Cell::default(); max_x + 1]; max_y + 1];
-
-    for (idx, Coords(x, y)) in points.iter().enumerate() {
-        field[*y][*x] = Cell::Point(idx);
-    }
-
-    for y in 0..=max_y {
-        for x in 0..=max_x {
-            // we only want to edit empty cells
-            #[cfg(feature = "debug_out")]
-            {
-                let c: char = field[y][x].into();
-                print!("({}, {}): {}", x, y, c);
-            }
-
-            if filter(field[y][x]) {
-                field[y][x] = transform(Coords(x, y), points);
-
-                #[cfg(feature = "debug_out")]
-                {
-                    let c: char = field[y][x].into();
-                    print!(" => {}", c);
-                }
-            }
-            #[cfg(feature = "debug_out")]
-            println!("");
-        }
-    }
-
-    #[cfg(feature = "debug_out")]
-    println!("{}", field_debug(&field));
-
-    Some(field)
-}
-
-pub fn voronoi(points: &[Coords]) -> Option<Field> {
-    make_field(
-        points,
-        |cell| cell == Cell::Empty,
-        |Coords(x, y), points| {
-            if points.len() < 2 {
-                return Cell::Region(0);
-            }
-
-            let mut dists: Vec<_> = points
-                .iter()
-                .enumerate()
-                .map(|(idx, &p)| (Coords(x, y).manhattan(p), idx))
-                .collect();
-            dists.sort();
-
-            #[cfg(feature = "debug_out")]
-            print!(" -> [{:?}, {:?}, ...]", dists[0], dists[1]);
-
-            if dists[0].0 == dists[1].0 {
-                Cell::Equidistant
-            } else {
-                Cell::Region(dists[0].1)
-            }
-        },
-    )
-}
-
-pub fn undermax(points: &[Coords], max_dist: usize) -> Option<Field> {
-    make_field(
-        points,
-        |cell| match cell {
-            Cell::Empty | Cell::Point(_) => true,
-            _ => false,
-        },
-        |coords, points| {
-            if points
-                .iter()
-                .map(|point| coords.manhattan(*point))
-                .sum::<usize>()
-                < max_dist
-            {
-                Cell::Safe
-            } else {
-                Cell::Empty
-            }
-        },
-    )
-}
-
-/// returns the size of the largest finite region
-pub fn biggest_finite(points: &[Coords], field: &Field) -> Option<u64> {
-    let mut is_finite = vec![true; points.len()];
-    let mut count = vec![0_u64; points.len()];
-
-    for (y_idx, row) in field.iter().enumerate() {
-        for (x_idx, cell) in row.iter().enumerate() {
-            match cell {
-                Cell::Empty => panic!("field must not contain empty cells"),
-                Cell::Equidistant | Cell::Safe => (),
-                Cell::Point(pid) | Cell::Region(pid) => {
-                    if is_finite[*pid] {
-                        count[*pid] += 1;
-                        if y_idx == 0
-                            || y_idx == field.len() - 1
-                            || x_idx == 0
-                            || x_idx == row.len() - 1
-                        {
-                            is_finite[*pid] = false;
-                        }
-                    }
-                }
+    let mut region_areas: HashMap<usize, usize> = HashMap::new();
+    for tile in map.iter().copied() {
+        if let Tile::Point(idx) | Tile::Region(idx) = tile {
+            if !infinite_regions.contains(&idx) {
+                *region_areas.entry(idx).or_default() += 1;
             }
         }
     }
 
-    is_finite
-        .iter()
-        .zip(count)
-        .filter_map(|(finite, count)| if *finite { Some(count) } else { None })
-        .max()
+    let mut region_areas: Vec<_> = region_areas.into_iter().collect();
+    region_areas.sort_unstable_by_key(|(_idx, area)| std::cmp::Reverse(*area));
+
+    match region_areas.first() {
+        Some((_idx, area)) => Ok(*area),
+        None => Err(Error::NoSolution),
+    }
 }
 
-pub fn safezone_size(field: &Field) -> usize {
-    field
-        .iter()
-        .map(|row| row.iter().filter(|cell| **cell == Cell::Safe).count())
-        .sum()
+fn size_of_safe_region(map: &Map, points: &[Point]) -> usize {
+    let mut count = 0;
+
+    map.for_each_point(|_tile, point| {
+        if points
+            .iter()
+            .map(|&coord| (coord - point).manhattan())
+            .sum::<i32>()
+            < SAFETY_THRESHOLD
+        {
+            count += 1;
+        }
+    });
+
+    count
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub fn part1(input: &Path) -> Result<(), Error> {
+    let points = parse_points(input)?;
+    let mut map = make_map(&points);
+    fill_map(&mut map, &points)?;
+    let area = largest_non_infinite_region(&map)?;
 
-    fn example() -> Vec<Coords> {
-        vec![
-            Coords(1, 1),
-            Coords(1, 6),
-            Coords(8, 3),
-            Coords(3, 4),
-            Coords(5, 5),
-            Coords(8, 9),
-        ]
-    }
+    println!("area of largest non-infinite region: {}", area);
+    Ok(())
+}
 
-    #[test]
-    fn test_biggest_finite() {
-        let points = example();
-        let field = voronoi(&points).unwrap();
-        let bf = biggest_finite(&points, &field).unwrap();
-        assert_eq!(17, bf);
-    }
+pub fn part2(input: &Path) -> Result<(), Error> {
+    let points = parse_points(input)?;
+    let mut map = make_map(&points);
+    fill_map(&mut map, &points)?;
+    let ssr = size_of_safe_region(&map, &points);
 
-    #[test]
-    fn test_safezone_size() {
-        let points = example();
-        let field = undermax(&points, 32).unwrap();
-        let ss = safezone_size(&field);
-        assert_eq!(16, ss);
-    }
+    println!("size of safe region: {}", ssr);
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("No solution found")]
+    NoSolution,
 }

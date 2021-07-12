@@ -1,15 +1,53 @@
-use day06::{biggest_finite, safezone_size, undermax, voronoi, Coords};
-use failure::format_err;
+use aoclib::{config::Config, website::get_input};
+use day06::{part1, part2};
 
-fn main() -> Result<(), failure::Error> {
-    let inputs = util::get_input_lines_as::<Coords>()?;
-    let field = voronoi(&inputs).ok_or_else(|| format_err!("could not voronoi"))?;
-    let bf =
-        biggest_finite(&inputs, &field).ok_or_else(|| format_err!("could not find biggest"))?;
-    println!("biggest finite: {}", bf);
-    let field =
-        undermax(&inputs, 10000).ok_or_else(|| format_err!("could not find values under max"))?;
-    let ss = safezone_size(&field);
-    println!("safezone size:  {}", ss);
+use color_eyre::eyre::Result;
+use structopt::StructOpt;
+use std::path::PathBuf;
+
+const YEAR: u32 = 2018;
+const DAY: u8 = 6;
+
+#[derive(StructOpt, Debug)]
+struct RunArgs {
+    /// input file
+    #[structopt(long, parse(from_os_str))]
+    input: Option<PathBuf>,
+
+    /// skip part 1
+    #[structopt(long)]
+    no_part1: bool,
+
+    /// run part 2
+    #[structopt(long)]
+    part2: bool,
+}
+
+impl RunArgs {
+    fn input(&self) -> Result<PathBuf> {
+        match self.input {
+            None => {
+                let config = Config::load()?;
+                // this does nothing if the input file already exists, but
+                // simplifies the workflow after cloning the repo on a new computer
+                get_input(&config, YEAR, DAY)?;
+                Ok(config.input_for(YEAR, DAY))
+            }
+            Some(ref path) => Ok(path.clone()),
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let args = RunArgs::from_args();
+    let input_path = args.input()?;
+
+    if !args.no_part1 {
+        part1(&input_path)?;
+    }
+    if args.part2 {
+        part2(&input_path)?;
+    }
     Ok(())
 }
