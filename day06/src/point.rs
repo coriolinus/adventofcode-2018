@@ -14,6 +14,6 @@ impl From<Point> for LibPoint {
     }
 }
 
-pub fn parse_points<'a>(input: &'a Path) -> std::io::Result<Vec<LibPoint>> {
+pub fn parse_points(input: &Path) -> std::io::Result<Vec<LibPoint>> {
     parse::<Point>(input).map(|iter| iter.map(Into::into).collect())
 }
