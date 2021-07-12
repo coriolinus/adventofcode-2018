@@ -463,8 +463,10 @@ dependencies = [
 name = "day08"
 version = "0.1.0"
 dependencies = [
- "failure",
- "util",
+ "aoclib",
+ "color-eyre",
+ "structopt",
+ "thiserror",
 ]
 
 [[package]]

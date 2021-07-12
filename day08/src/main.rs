@@ -1,11 +1,53 @@
-use day08::Node;
+use aoclib::{config::Config, website::get_input};
+use day08::{part1, part2};
 
-fn main() -> Result<(), failure::Error> {
-    let input = day08::parse_input(&util::get_input_string()?)?;
-    let (node, leftovers) = Node::try_parse(&input)
-        .ok_or_else(|| failure::format_err!("failed to parse input as nodes"))?;
-    debug_assert!(leftovers.is_empty());
-    println!("sum of metadata: {}", node.sum_metadata());
-    println!("root value:      {}", node.value());
+use color_eyre::eyre::Result;
+use structopt::StructOpt;
+use std::path::PathBuf;
+
+const YEAR: u32 = 2018;
+const DAY: u8 = 8;
+
+#[derive(StructOpt, Debug)]
+struct RunArgs {
+    /// input file
+    #[structopt(long, parse(from_os_str))]
+    input: Option<PathBuf>,
+
+    /// skip part 1
+    #[structopt(long)]
+    no_part1: bool,
+
+    /// run part 2
+    #[structopt(long)]
+    part2: bool,
+}
+
+impl RunArgs {
+    fn input(&self) -> Result<PathBuf> {
+        match self.input {
+            None => {
+                let config = Config::load()?;
+                // this does nothing if the input file already exists, but
+                // simplifies the workflow after cloning the repo on a new computer
+                get_input(&config, YEAR, DAY)?;
+                Ok(config.input_for(YEAR, DAY))
+            }
+            Some(ref path) => Ok(path.clone()),
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let args = RunArgs::from_args();
+    let input_path = args.input()?;
+
+    if !args.no_part1 {
+        part1(&input_path)?;
+    }
+    if args.part2 {
+        part2(&input_path)?;
+    }
     Ok(())
 }
