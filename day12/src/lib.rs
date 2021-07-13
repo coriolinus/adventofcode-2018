@@ -4,7 +4,7 @@ mod input;
 use std::path::Path;
 
 use lalrpop_util::lalrpop_mod;
-lalrpop_mod!(pub parser); // synthesized by LALRPOP
+lalrpop_mod!(#[allow(clippy::all)] pub parser); // synthesized by LALRPOP
 
 // each array of 5 bits corresponds to a single number in the range `0..32`,
 // so we can encode the complete ruleset as an array of 32 bools.
