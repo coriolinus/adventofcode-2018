@@ -77,8 +77,8 @@ impl FuelGrid {
         debug_assert_ne!(edge_size, 0, "edge size must not be zero");
 
         let mut total_power = 0;
-        for x in 0..=edge_size {
-            for y in 0..=edge_size {
+        for x in 0..edge_size {
+            for y in 0..edge_size {
                 total_power += self[(x, y)];
             }
         }
@@ -123,6 +123,11 @@ impl FuelGrid {
             })
             .take_while(|maybe_cell| maybe_cell.is_some())
             .map(|cell| cell.expect("known to be Some from check above"))
+    }
+
+    /// Iterate over all fuel cells of all edge sizes.
+    fn fuel_cells_all_sizes(&self) -> impl Iterator<Item = FuelCell> {
+        (1..=EDGE_SIZE).flat_map(move |edge_size| self.fuel_cells(edge_size))
     }
 }
 
@@ -223,8 +228,20 @@ pub fn part1(input: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn part2(_input: &Path) -> Result<(), Error> {
-    unimplemented!()
+pub fn part2(input: &Path) -> Result<(), Error> {
+    for fuel_grid in parse::<FuelGrid>(input)? {
+        let max_power_cell = fuel_grid
+            .fuel_cells_all_sizes()
+            .max_by_key(|cell| cell.total_power)
+            .expect("fuel grid is never empty");
+        // offset by 1 because AoC expects 1-indexing for this problem
+        let coords = max_power_cell.origin + Point::new(1, 1);
+        println!(
+            "for serial {}: origin of max power cell (all sizes): {},{},{}",
+            fuel_grid.serial, coords.x, coords.y, max_power_cell.edge_size,
+        );
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
