@@ -67,7 +67,7 @@ fn no_prerequisites(graph: &Graph) -> impl '_ + Iterator<Item = Step> {
 fn topo_sort(mut graph: Graph) -> Vec<Step> {
     let mut out = Vec::with_capacity(graph.len());
 
-    let mut ready: BinaryHeap<_> = no_prerequisites(&graph).map(|step| Reverse(step)).collect();
+    let mut ready: BinaryHeap<_> = no_prerequisites(&graph).map(Reverse).collect();
 
     while let Some(Reverse(step)) = ready.pop() {
         out.push(step);
@@ -126,7 +126,7 @@ impl PartialOrd for Event {
 }
 
 fn make_duration_of(duration_base: Seconds) -> impl Fn(Step) -> Seconds {
-    move |step| duration_base + 1 + (step as u8 - 'A' as u8) as Seconds
+    move |step| duration_base + 1 + (step as u8 - b'A') as Seconds
 }
 
 fn assembly_time(graph: Graph) -> Seconds {

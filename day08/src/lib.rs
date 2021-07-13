@@ -13,7 +13,7 @@ fn parse_input_file(input: &Path) -> Result<Vec<u8>, Error> {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Node<'i> {
-    children: Vec<Box<Node<'i>>>,
+    children: Vec<Node<'i>>,
     metadata: &'i [u8],
 }
 
@@ -36,7 +36,7 @@ impl<'i> Node<'i> {
         // parse child nodes
         for _ in 0..nchildren {
             let (child, remaining) = Node::try_parse(input)?;
-            out.children.push(Box::new(child));
+            out.children.push(child);
             input = remaining;
         }
 
