@@ -55,31 +55,16 @@ impl FromStr for Light {
 
 /// Compute the `(min, max)` bounds enclosing the given points.
 fn bounds(points: &[Light]) -> (Point, Point) {
-    let mut min_x: Option<i32> = None;
-    let mut max_x: Option<i32> = None;
-    let mut min_y: Option<i32> = None;
-    let mut max_y: Option<i32> = None;
-
-    macro_rules! update {
-        ($value:ident <= $op:ident($field:expr)) => {
-            $value = match $value {
-                None => Some($field),
-                Some(v) => Some(v.$op($field)),
-            };
-        };
-    }
-
+    let mut min = Point::new(i32::MAX, i32::MAX);
+    let mut max = Point::new(i32::MIN, i32::MIN);
     for point in points {
-        update!(min_x <= min(point.position.x));
-        update!(min_y <= min(point.position.y));
-        update!(max_x <= max(point.position.x));
-        update!(max_y <= max(point.position.y));
+        min.x = min.x.min(point.position.x);
+        min.y = min.y.min(point.position.y);
+        max.x = max.x.max(point.position.x);
+        max.y = max.y.max(point.position.y);
     }
 
-    (
-        Point::new(min_x.unwrap_or_default(), min_y.unwrap_or_default()),
-        Point::new(max_x.unwrap_or_default(), max_y.unwrap_or_default()),
-    )
+    (min, max)
 }
 
 /// Compute the bounding area of the given points.
