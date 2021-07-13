@@ -38,7 +38,7 @@ dependencies = [
 [[package]]
 name = "aoclib"
 version = "0.1.0"
-source = "git+https://github.com/coriolinus/aoclib.git#d1a914784d10edbd629a689f625c77b688c65bd5"
+source = "git+https://github.com/coriolinus/aoclib.git#e8db88b8526a3b7310bf9aa2d09fedbf82cac16a"
 dependencies = [
  "bitvec",
  "dirs",
@@ -484,11 +484,12 @@ dependencies = [
 name = "day10"
 version = "0.1.0"
 dependencies = [
- "failure",
- "itertools 0.8.2",
+ "aoclib",
+ "color-eyre",
  "lazy_static",
  "regex",
- "util",
+ "structopt",
+ "thiserror",
 ]
 
 [[package]]

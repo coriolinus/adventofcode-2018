@@ -5,8 +5,9 @@ authors = ["Peter Goodspeed-Niklaus <peter.r.goodspeedniklaus@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-failure="0.1"
-util = {path="../util"}
-regex = "1"
-lazy_static = "1"
-itertools="0.8"
+aoclib = { git = "https://github.com/coriolinus/aoclib.git" }
+color-eyre = "0.5.10"
+lazy_static = "1.4.0"
+regex = "1.5.4"
+structopt = "0.3.21"
+thiserror = "1.0.22"
