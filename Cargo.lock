@@ -473,7 +473,11 @@ dependencies = [
 name = "day09"
 version = "0.1.0"
 dependencies = [
- "slab",
+ "aoclib",
+ "color-eyre",
+ "parse-display 0.5.0",
+ "structopt",
+ "thiserror",
 ]
 
 [[package]]

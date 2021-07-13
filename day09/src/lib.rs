@@ -1,41 +1,11 @@
-use std::collections::VecDeque;
+use aoclib::parse;
+use std::{collections::VecDeque, path::Path};
 
-pub trait Rotate {
-    fn step_left(&mut self);
-    fn step_right(&mut self);
-
-    fn seek(&mut self, steps: isize) {
-        match steps {
-            0 => (),
-            n if n > 0 => {
-                for _ in 0..n {
-                    self.step_right();
-                }
-            }
-            n if n < 0 => {
-                for _ in 0..n.abs() {
-                    self.step_left();
-                }
-            }
-            _ => unreachable!(),
-        }
-    }
-}
-
-pub type Circle = VecDeque<u32>;
-
-impl Rotate for Circle {
-    fn step_right(&mut self) {
-        if let Some(n) = self.pop_back() {
-            self.push_front(n);
-        }
-    }
-
-    fn step_left(&mut self) {
-        if let Some(n) = self.pop_front() {
-            self.push_back(n);
-        }
-    }
+#[derive(Debug, parse_display::FromStr, parse_display::Display, Clone, Copy)]
+#[display("{players} players; last marble is worth {last_marble} points")]
+struct Rules {
+    players: usize,
+    last_marble: u32,
 }
 
 #[derive(Debug)]
@@ -44,13 +14,24 @@ pub struct State {
     next_marble: u32,
     next_player: usize,
     scores: Vec<u32>,
-    circle: Circle,
+    circle: VecDeque<u32>,
+}
+
+impl From<Rules> for State {
+    fn from(
+        Rules {
+            players,
+            last_marble,
+        }: Rules,
+    ) -> Self {
+        State::new(players, last_marble)
+    }
 }
 
 impl State {
     pub fn new(players: usize, last_marble: u32) -> State {
         // preload the first two steps, which are confusing anyway.
-        let mut circle = Circle::with_capacity(last_marble as usize);
+        let mut circle = VecDeque::with_capacity(last_marble as usize);
         circle.push_back(0);
         circle.push_back(1);
 
@@ -75,10 +56,10 @@ impl State {
 
         if marble % 23 == 0 {
             self.scores[player] += marble;
-            self.circle.seek(-7);
+            self.circle.rotate_left(7);
             self.scores[player] += self.circle.pop_back().unwrap();
         } else {
-            self.circle.seek(2);
+            self.circle.rotate_right(2);
             self.circle.push_back(marble);
         }
     }
@@ -101,6 +82,37 @@ impl State {
             .max()
             .map(|(s, e)| (e, s))
     }
+}
+
+pub fn part1(input: &Path) -> Result<(), Error> {
+    for rules in parse::<Rules>(input)? {
+        let mut state: State = rules.into();
+        state.run();
+        let (_player, winning_score) = state.winner().ok_or(Error::NoSolution)?;
+
+        println!("{} => winning score: {}", rules, winning_score);
+    }
+    Ok(())
+}
+
+pub fn part2(input: &Path) -> Result<(), Error> {
+    for mut rules in parse::<Rules>(input)? {
+        rules.last_marble *= 100;
+        let mut state: State = rules.into();
+        state.run();
+        let (_player, winning_score) = state.winner().ok_or(Error::NoSolution)?;
+
+        println!("{} => winning score: {}", rules, winning_score);
+    }
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("No solution found")]
+    NoSolution,
 }
 
 #[cfg(test)]
