@@ -1,25 +1,53 @@
-use day12::{Input, State};
-use failure::{format_err, Error};
+use aoclib::{config::Config, website::get_input};
+use day12::{part1, part2};
 
-fn parse_input() -> Result<Input, Error> {
-    let input = util::get_input_string()?;
-    let parser = day12::input::InputParser::new();
-    let input = parser
-        .parse(&input)
-        .map_err(|e| format_err!("{}", e.to_string()))?;
-    Ok(input)
+use color_eyre::eyre::Result;
+use structopt::StructOpt;
+use std::path::PathBuf;
+
+const YEAR: u32 = 2018;
+const DAY: u8 = 12;
+
+#[derive(StructOpt, Debug)]
+struct RunArgs {
+    /// input file
+    #[structopt(long, parse(from_os_str))]
+    input: Option<PathBuf>,
+
+    /// skip part 1
+    #[structopt(long)]
+    no_part1: bool,
+
+    /// run part 2
+    #[structopt(long)]
+    part2: bool,
 }
 
-fn main() -> Result<(), Error> {
-    let input = parse_input()?;
-    println!("{} pots; {} rules", input.initial.len(), input.rules.len());
+impl RunArgs {
+    fn input(&self) -> Result<PathBuf> {
+        match self.input {
+            None => {
+                let config = Config::load()?;
+                // this does nothing if the input file already exists, but
+                // simplifies the workflow after cloning the repo on a new computer
+                get_input(&config, YEAR, DAY)?;
+                Ok(config.input_for(YEAR, DAY))
+            }
+            Some(ref path) => Ok(path.clone()),
+        }
+    }
+}
 
-    const GENERATION_TARGET: usize = 20;
-    let rules = input.rules();
-    let mut state: State = input.initial.into();
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let args = RunArgs::from_args();
+    let input_path = args.input()?;
 
-    state = day12::steps(&state, &rules, GENERATION_TARGET);
-    println!("idx sum: {}", state.sum_indices(GENERATION_TARGET));
-
+    if !args.no_part1 {
+        part1(&input_path)?;
+    }
+    if args.part2 {
+        part2(&input_path)?;
+    }
     Ok(())
 }

@@ -3,13 +3,18 @@ name = "day12"
 version = "0.1.0"
 authors = ["Peter Goodspeed-Niklaus <peter.r.goodspeedniklaus@gmail.com>"]
 edition = "2018"
-build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
-failure = "0.1"
-lalrpop-util = "0.16.2"
-regex = "1.1"
-util = { path = "../util" }
+aoclib = { git = "https://github.com/coriolinus/aoclib.git" }
+bitvec = "0.22.3"
+color-eyre = "0.5.10"
+lalrpop-util = "0.19.6"
+regex = "1.5.4"
+structopt = "0.3.21"
+thiserror = "1.0.22"
 
 [build-dependencies]
-lalrpop = "0.16.2"
+lalrpop = "0.19.6"
+
+[dev-dependencies]
+rstest = "0.10.0"
