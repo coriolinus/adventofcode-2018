@@ -87,16 +87,22 @@ fn tick(lights: &mut [Light]) {
 fn find_min_area(mut lights: Vec<Light>) -> (Vec<Light>, usize) {
     let mut count = 0;
 
-    let mut prev_state = lights.clone();
+    let mut prev_area = area(&lights);
     tick(&mut lights);
+    let mut current_area = area(&lights);
 
-    while area(&lights) <= area(&prev_state) {
-        prev_state = lights.clone();
+    while current_area <= prev_area {
+        prev_area = current_area;
         tick(&mut lights);
+        current_area = area(&lights);
         count += 1;
     }
 
-    (prev_state, count)
+    for light in lights.iter_mut() {
+        light.position -= light.velocity;
+    }
+
+    (lights, count)
 }
 
 fn to_map(mut lights: Vec<Light>) -> Map<Bool> {
