@@ -2,6 +2,7 @@ use aoclib::{
     geometry::{Direction, Point},
     parse,
 };
+use rayon::prelude::*;
 use std::{
     iter,
     num::ParseIntError,
@@ -126,8 +127,10 @@ impl FuelGrid {
     }
 
     /// Iterate over all fuel cells of all edge sizes.
-    fn fuel_cells_all_sizes(&self) -> impl Iterator<Item = FuelCell> {
-        (1..=EDGE_SIZE).flat_map(move |edge_size| self.fuel_cells(edge_size))
+    fn fuel_cells_all_sizes(&self) -> impl ParallelIterator<Item = FuelCell> {
+        (1..=EDGE_SIZE)
+            .into_par_iter()
+            .flat_map_iter(move |edge_size| self.fuel_cells(edge_size))
     }
 }
 
