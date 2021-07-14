@@ -1,7 +1,7 @@
 mod encode_as_u8;
 mod input;
 
-use bitvec::vec::BitVec;
+use bitvec::prelude::*;
 use encode_as_u8::EncodeAsU8;
 use std::{
     ops::{Deref, Index},
@@ -35,10 +35,23 @@ impl Index<isize> for State {
 }
 
 impl State {
+    fn from_initial(initial: BitVec) -> Self {
+        Self {
+            pots: initial,
+            zero_offset: 0,
+        }
+    }
+
     /// Set a bit of this state.
     fn set(&mut self, index: isize, value: bool) {
         assert!(self.zero_offset + index >= 0, "index out of bounds");
         self.pots.set((self.zero_offset + index) as usize, value);
+    }
+
+    /// Iterate over all pots and relevant indices in the state.
+    fn iter_enumerated(&self) -> impl '_ + Iterator<Item = (isize, bool)> {
+        std::iter::successors(Some(-self.zero_offset), |&offset| Some(offset + 1))
+            .zip(self.pots.iter().by_val())
     }
 
     /// Enumerate over all windows of length 5 which are centered
@@ -108,12 +121,38 @@ impl State {
 
         left_overhangs.chain(iteration).chain(right_overhangs)
     }
+
+    fn successor(&self, rules: &Rules) -> State {
+        let mut succ = State {
+            pots: bitvec![0; self.pots.len() + 2],
+            zero_offset: self.zero_offset + 1,
+        };
+
+        for (idx, val) in self.windows_enumerated() {
+            succ.set(idx, rules[val as usize]);
+        }
+
+        succ
+    }
+}
+
+fn nth_generation(n: usize, mut state: State, rules: &Rules) -> State {
+    for _ in 0..n {
+        state = state.successor(rules);
+    }
+    state
 }
 
 pub fn part1(input: &Path) -> Result<(), Error> {
-    let input = input::Input::load_file(input)?;
-    let rules = input.rules;
-    unimplemented!()
+    let input::Input { rules, initial } = input::Input::load_file(input)?;
+    let state = State::from_initial(initial);
+    let state = nth_generation(20, state, &rules);
+    let pot_sum: isize = state
+        .iter_enumerated()
+        .filter_map(|(idx, has_plant)| has_plant.then(move || idx))
+        .sum();
+    println!("pot sum after 20 generation: {}", pot_sum);
+    Ok(())
 }
 
 pub fn part2(_input: &Path) -> Result<(), Error> {
@@ -133,7 +172,6 @@ pub enum Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitvec::prelude::*;
 
     #[test]
     fn test_windows_enumerated_indices() {
@@ -141,10 +179,7 @@ mod tests {
             let pots = bitvec![0; n_pots];
 
             for offset in 0..pots.len() {
-                let state = State {
-                    pots: pots.clone(),
-                    zero_offset: offset as isize,
-                };
+                let state = State::from_initial(pots.clone());
 
                 let (indices, values): (Vec<_>, Vec<_>) = state.windows_enumerated().unzip();
 
@@ -170,14 +205,17 @@ mod tests {
             let pots: BitVec = IntoIter::new([true, false]).cycle().take(n_pots).collect();
             let expect: Vec<_> = IntoIter::new([0b0010, 0b00101, 0b01010])
                 .chain(IntoIter::new([0b10101, 0b01010]).cycle().take(n_pots - 4))
-                .chain(IntoIter::new([0b01010, 0b10100, 0b01000]).map(|v| if n_pots % 2 == 0 {(v << 1) & 0b11111} else {v}))
+                .chain(IntoIter::new([0b01010, 0b10100, 0b01000]).map(|v| {
+                    if n_pots % 2 == 0 {
+                        (v << 1) & 0b11111
+                    } else {
+                        v
+                    }
+                }))
                 .collect();
 
             for offset in 0..pots.len() {
-                let state = State {
-                    pots: pots.clone(),
-                    zero_offset: offset as isize,
-                };
+                let state = State::from_initial(pots.clone());
 
                 let (_, values): (Vec<_>, Vec<_>) = state.windows_enumerated().unzip();
                 dbg!(n_pots, offset);
