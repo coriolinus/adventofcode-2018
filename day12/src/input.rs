@@ -1,31 +1,76 @@
 //! This module handles parsing the input.
 //
-// It's reliant on the `pest` parser generator, which I have mixed feelings about.
-// On the one hand, it's more powerful than LALRPOP; it Just Works on the input
-// for this day, which LALRPOP didn't even with some research and tweaking.
+// It's reliant on the `pest` parser generator plus the `pest_consume` helpers;
+// this is strictly more powerful than LALRPOP, as it can handle newline limits
+// much better, but it's still a little cumbersome. In particular, I wish that
+// it was a bit more straightforward to define the transforms from nodes into
+// real types.
 //
-// On the other hand, it doesn't provide a very convenient interface; having parsed
-// the input, I now have to walk the parse tree manually and produce my desired types
-// by hand. That doesn't feel great, particularly when combined with this bit of the
-// documentation:
-//
-// > You _should_ rely on the maning of your grammar for properties such as "contains
-// > _n_ sub-rules", "is safe to `parse` to `f32`", and "never fails to match". Idiomatic
-// > `pest` code uses `unwrap` and `unreachable!`.
-//
-// That feels somewhat brittle; it's safe as long as all changes to `parser.pest`
-// are always synchronized with changes here.
+// Still, this is a ton better than just using `pest` on its own, and `pest`
+// itself is both easier to use and somewhat more powerful than lalrpop.
+// This all counts as growing pains; I suspect that for non-trivial parsing
+// in the future, I'll be reaching for this solution again.
 
 use crate::{encode_as_u8::EncodeAsU8, Error, Rules};
 use bitvec::vec::BitVec;
+use pest_consume::{match_nodes, Parser};
 use std::path::Path;
 
-use pest::Parser;
-use pest_derive::Parser;
+type Node<'i> = pest_consume::Node<'i, Rule, ()>;
+type ParseResult<T> = Result<T, pest_consume::Error<Rule>>;
 
 #[derive(Parser)]
 #[grammar = "parser.pest"]
 pub struct InputParser;
+
+#[pest_consume::parser]
+impl InputParser {
+    fn EOI(_input: Node) -> ParseResult<()> {
+        Ok(())
+    }
+
+    fn pot(input: Node) -> ParseResult<bool> {
+        match input.as_str() {
+            "." => Ok(false),
+            "#" => Ok(true),
+            _ => Err(input.error("expected '#' or '.'")),
+        }
+    }
+
+    fn state(input: Node) -> ParseResult<BitVec> {
+        Ok(match_nodes!(input.into_children();
+            [pot(pots)..] => pots.collect(),
+        ))
+    }
+
+    fn rule(input: Node) -> ParseResult<([bool; 5], bool)> {
+        Ok(match_nodes!(input.into_children();
+            [pot(p0), pot(p1), pot(p2), pot(p3), pot(p4), pot(p5)] => {
+                ([p0, p1, p2, p3, p4], p5)
+            }
+        ))
+    }
+
+    fn rules(input: Node) -> ParseResult<Rules> {
+        Ok(match_nodes!(input.into_children();
+            [rule(rules)..] => {
+                let mut rules_list = Rules::default();
+
+                for (idx, val) in rules {
+                    rules_list[idx.as_u8() as usize] = val;
+                }
+
+                rules_list
+            },
+        ))
+    }
+
+    fn file(input: Node) -> ParseResult<Input> {
+        Ok(match_nodes!(input.into_children();
+            [state(initial), rules(rules), EOI(_eoi)] => Input{ initial, rules },
+        ))
+    }
+}
 
 /// Representation of the day's input.
 #[derive(Debug)]
@@ -35,37 +80,14 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(path: &Path) -> Result<Self, Error> {
+    pub fn load_file(path: &Path) -> Result<Self, Error> {
         let input_data = std::fs::read_to_string(path)?;
-        let mut file_pairs = InputParser::parse(Rule::file, &input_data)?
-            .next()
-            .unwrap()
-            .into_inner();
-        let initial: BitVec = file_pairs
-            .next()
-            .unwrap()
-            .into_inner()
-            .map(|rule| match rule.as_str() {
-                "." => false,
-                "#" => true,
-                _ => unreachable!(),
-            })
-            .collect();
+        Self::new(&input_data)
+    }
 
-        let mut rules = Rules::default();
-        for rule_def in file_pairs.next().unwrap().into_inner() {
-            let mut bits = [false; 5];
-            let mut bit_rule_iter = rule_def.into_inner();
-            for (idx, bit_rule) in bit_rule_iter.by_ref().take(5).enumerate() {
-                if bit_rule.as_str() == "#" {
-                    bits[idx] = true;
-                }
-            }
-            if bit_rule_iter.next().unwrap().as_str() == "#" {
-                rules[bits.as_u8() as usize] = true;
-            }
-        }
-
-        Ok(Self { initial, rules })
+    pub fn new(input_data: &str) -> Result<Self, Error> {
+        let inputs = InputParser::parse(Rule::file, &input_data)?;
+        let input = inputs.single()?;
+        InputParser::file(input).map_err(Into::into)
     }
 }

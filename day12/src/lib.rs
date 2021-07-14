@@ -8,7 +8,8 @@ use std::path::Path;
 pub type Rules = [bool; 32];
 
 pub fn part1(input: &Path) -> Result<(), Error> {
-    let input = input::Input::new(input)?;
+    let input = input::Input::load_file(input)?;
+    dbg!(&input);
     let rules = input.rules;
     unimplemented!()
 }
