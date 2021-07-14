@@ -172,7 +172,7 @@ fn advance_until_steady_state(state: State, rules: &Rules) -> (usize, State, isi
 pub fn part1(input: &Path) -> Result<(), Error> {
     let input::Input { rules, initial } = input::Input::load_file(input)?;
     let state = State::from_initial(initial);
-    let state = state.into_iter(&rules).skip(20).next().unwrap();
+    let state = state.into_iter(&rules).nth(20).unwrap();
     let pot_sum: isize = state.pot_sum();
     println!("pot sum after 20 generations: {}", pot_sum);
     Ok(())
@@ -210,7 +210,7 @@ mod tests {
         for n_pots in 5..=10 {
             let pots = bitvec![0; n_pots];
 
-            for offset in 0..pots.len() {
+            for _ in 0..pots.len() {
                 let state = State::from_initial(pots.clone());
 
                 let (indices, values): (Vec<_>, Vec<_>) = state.windows_enumerated().unzip();
