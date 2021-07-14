@@ -2,8 +2,9 @@ mod encode_as_u8;
 mod input;
 
 use bitvec::vec::BitVec;
+use encode_as_u8::EncodeAsU8;
 use std::{
-    ops::{Deref, Index, IndexMut},
+    ops::{Deref, Index},
     path::Path,
 };
 
@@ -36,7 +37,8 @@ impl Index<isize> for State {
 impl State {
     /// Set a bit of this state.
     fn set(&mut self, index: isize, value: bool) {
-        todo!()
+        assert!(self.zero_offset + index >= 0, "index out of bounds");
+        self.pots.set((self.zero_offset + index) as usize, value);
     }
 
     /// Enumerate over all windows of length 5 which are centered
@@ -45,11 +47,66 @@ impl State {
     ///
     /// The index returned is the offset of the center item in the window.
     ///
-    /// Note that this produces 4 more items than `self.len()`: there
-    /// are two items overhanging on each side.
-    fn windows_enumerated(&self) -> impl Iterator<Item = (isize, u8)> {
-        todo!();
-        std::iter::empty()
+    /// Note that this produces two more items than `self.len()`.
+    /// Normally, windows produces `self.len() - windows - 1` items, and `windows`
+    /// here is five. However, this iteration includes windows overhanging
+    /// each side by up to 3 values.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `self.len() < 5`.
+    fn windows_enumerated(&self) -> impl '_ + Iterator<Item = (isize, u8)> {
+        assert!(
+            self.len() >= 5,
+            "can only enumerate windows when at least 5 items present"
+        );
+
+        let self_len = self.len();
+        let zero_offset = self.zero_offset;
+
+        let left_overhang_3 = [self.pots[0], self.pots[1]].as_u8();
+        let left_overhang_2 = [self.pots[0], self.pots[1], self.pots[2]].as_u8();
+        let left_overhang_1 = [self.pots[0], self.pots[1], self.pots[2], self.pots[3]].as_u8();
+        let left_overhangs =
+            std::array::IntoIter::new([left_overhang_3, left_overhang_2, left_overhang_1])
+                .enumerate()
+                .map(move |(idx, val)| (idx as isize - zero_offset - 1, val));
+
+        let right_overhang_1 = [
+            self.pots[self.len() - 4],
+            self.pots[self.len() - 3],
+            self.pots[self.len() - 2],
+            self.pots[self.len() - 1],
+            false,
+        ]
+        .as_u8();
+        let right_overhang_2 = [
+            self.pots[self.len() - 3],
+            self.pots[self.len() - 2],
+            self.pots[self.len() - 1],
+            false,
+            false,
+        ]
+        .as_u8();
+        let right_overhang_3 = [
+            self.pots[self.len() - 2],
+            self.pots[self.len() - 1],
+            false,
+            false,
+            false,
+        ]
+        .as_u8();
+        let right_overhangs =
+            std::array::IntoIter::new([right_overhang_1, right_overhang_2, right_overhang_3])
+                .enumerate()
+                .map(move |(idx, val)| ((idx + self_len) as isize - zero_offset - 2, val));
+
+        let iteration = self
+            .windows(5)
+            .enumerate()
+            .map(move |(idx, val)| (idx as isize - zero_offset + 2, val.as_u8()));
+
+        left_overhangs.chain(iteration).chain(right_overhangs)
     }
 }
 
@@ -71,4 +128,66 @@ pub enum Error {
     Parse(#[from] pest::error::Error<input::Rule>),
     #[error("No solution found")]
     NoSolution,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bitvec::prelude::*;
+
+    #[test]
+    fn test_windows_enumerated_indices() {
+        for n_pots in 5..=10 {
+            let pots = bitvec![0; n_pots];
+
+            for offset in 0..pots.len() {
+                let state = State {
+                    pots: pots.clone(),
+                    zero_offset: offset as isize,
+                };
+
+                let (indices, values): (Vec<_>, Vec<_>) = state.windows_enumerated().unzip();
+
+                assert!(values.into_iter().all(|value| value == 0));
+
+                assert_eq!(indices.len(), pots.len() + 2);
+                assert_eq!(indices[0], -1 - state.zero_offset);
+                assert_eq!(
+                    *indices.last().unwrap(),
+                    pots.len() as isize - state.zero_offset,
+                );
+
+                assert!(indices.windows(2).all(|window| window[1] == window[0] + 1));
+            }
+        }
+    }
+
+    #[test]
+    fn test_windows_enumerated_values() {
+        use std::array::IntoIter;
+
+        for n_pots in 5..=10 {
+            let pots: BitVec = IntoIter::new([true, false]).cycle().take(n_pots).collect();
+            let expect: Vec<_> = IntoIter::new([0b0010, 0b00101, 0b01010])
+                .chain(IntoIter::new([0b10101, 0b01010]).cycle().take(n_pots - 4))
+                .chain(IntoIter::new([0b01010, 0b10100, 0b01000]).map(|v| if n_pots % 2 == 0 {(v << 1) & 0b11111} else {v}))
+                .collect();
+
+            for offset in 0..pots.len() {
+                let state = State {
+                    pots: pots.clone(),
+                    zero_offset: offset as isize,
+                };
+
+                let (_, values): (Vec<_>, Vec<_>) = state.windows_enumerated().unzip();
+                dbg!(n_pots, offset);
+                eprintln!("values = [");
+                for value in &values {
+                    eprintln!("  {:#07b},", value);
+                }
+                eprintln!("]");
+                assert_eq!(values, expect);
+            }
+        }
+    }
 }
