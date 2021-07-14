@@ -1,0 +1,5 @@
+pot = {"." | "#"}
+state = {^"initial state: " ~ pot*}
+rule = {pot{5} ~ " => " ~ pot}
+rules = {("\n" ~ rule)* ~ "\n"?}
+file = {SOI ~ state ~ "\n" ~ rules ~ EOI}
