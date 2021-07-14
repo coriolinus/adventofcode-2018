@@ -134,29 +134,61 @@ impl State {
 
         succ
     }
+
+    fn pot_sum(&self) -> isize {
+        self.iter_enumerated()
+            .filter_map(|(idx, has_plant)| has_plant.then(move || idx))
+            .sum()
+    }
+
+    fn into_iter(self, rules: &Rules) -> impl '_ + Iterator<Item = State> {
+        std::iter::successors(Some(self), move |state| Some(state.successor(rules)))
+    }
 }
 
-fn nth_generation(n: usize, mut state: State, rules: &Rules) -> State {
-    for _ in 0..n {
-        state = state.successor(rules);
+/// Keep calculating successors until the system settles down into a steady state, as indicated
+/// by the difference remaining constant twice in a row.
+///
+/// Returns `(generation, state, diff of sums)`.
+fn advance_until_steady_state(state: State, rules: &Rules) -> (usize, State, isize) {
+    let mut old_sum = 0;
+    let mut older_sum = 0;
+
+    for (generation, state) in state.into_iter(rules).enumerate() {
+        let sum = state.pot_sum();
+        let older_diff = old_sum - older_sum;
+        let diff = sum - old_sum;
+        if diff == older_diff {
+            return (generation, state, diff);
+        }
+
+        older_sum = old_sum;
+        old_sum = sum;
     }
-    state
+
+    unreachable!("state is known to stabilize within 1000 iterations")
 }
 
 pub fn part1(input: &Path) -> Result<(), Error> {
     let input::Input { rules, initial } = input::Input::load_file(input)?;
     let state = State::from_initial(initial);
-    let state = nth_generation(20, state, &rules);
-    let pot_sum: isize = state
-        .iter_enumerated()
-        .filter_map(|(idx, has_plant)| has_plant.then(move || idx))
-        .sum();
-    println!("pot sum after 20 generation: {}", pot_sum);
+    let state = state.into_iter(&rules).skip(20).next().unwrap();
+    let pot_sum: isize = state.pot_sum();
+    println!("pot sum after 20 generations: {}", pot_sum);
     Ok(())
 }
 
-pub fn part2(_input: &Path) -> Result<(), Error> {
-    unimplemented!()
+pub fn part2(input: &Path) -> Result<(), Error> {
+    let input::Input { rules, initial } = input::Input::load_file(input)?;
+    let state = State::from_initial(initial);
+    let (generation, state, diff) = advance_until_steady_state(state, &rules);
+
+    const TARGET_GENERATION: usize = 50_000_000_000;
+
+    let total = state.pot_sum() as usize + (diff as usize * (TARGET_GENERATION - generation));
+    println!("pot sum after {} generations: {}", TARGET_GENERATION, total);
+
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
