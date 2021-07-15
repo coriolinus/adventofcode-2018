@@ -81,11 +81,7 @@ impl Map {
         });
         debug_assert!(!self.0.iter().any(|&track| matches!(track, Track::Cart(_))));
 
-        Carts {
-            map: self,
-            carts,
-            remove_collisions: false,
-        }
+        Carts { map: self, carts }
     }
 }
 
@@ -155,7 +151,6 @@ impl Default for Turn {
 struct Carts<'a> {
     map: &'a Map,
     carts: Vec<Cart>,
-    remove_collisions: bool,
 }
 
 impl<'a> Carts<'a> {
@@ -215,7 +210,7 @@ impl<'a> Carts<'a> {
             };
 
             // there should only be one dead cart at any given point, but it can't hurt to check all of them.
-            // we have to collect these in advance to avoid a double-borrow of `self.carts`.
+            // we have to collect these in advance to avoid a borrow conflict of `self.carts`.
             let collision_indices: Vec<_> = self
                 .carts
                 .iter()
@@ -234,18 +229,16 @@ impl<'a> Carts<'a> {
         }
 
         // clean up the carts list to get rid of the dead
-        if self.remove_collisions {
-            let old_cart_count = self.carts.len();
+        let old_cart_count = self.carts.len();
 
-            self.carts.retain(|cart| !cart.dead);
+        self.carts.retain(|cart| !cart.dead);
 
-            if !collisions.is_empty() {
-                debug_assert_eq!(
-                    old_cart_count - self.carts.len(),
-                    2 * collisions.len(),
-                    "each collision must remove two carts"
-                );
-            }
+        if !collisions.is_empty() {
+            debug_assert_eq!(
+                old_cart_count - self.carts.len(),
+                2 * collisions.len(),
+                "each collision must remove two carts"
+            );
         }
 
         collisions
@@ -271,7 +264,6 @@ impl<'a> Carts<'a> {
 
     /// Loop until only one cart remains. Return the position of the final cart.
     fn run_until_last_cart(&mut self) -> Result<Point, Error> {
-        self.remove_collisions = true;
         while self.carts.len() > 1 {
             self.tick();
         }
@@ -354,7 +346,6 @@ mod tests {
         // behavior of the actual user function
         let mut carts = map.extract_carts();
         let mut carts2 = carts.clone();
-        carts.remove_collisions = true;
 
         eprintln!("{}", &carts);
 
