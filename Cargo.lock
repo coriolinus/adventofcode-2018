@@ -38,7 +38,7 @@ dependencies = [
 [[package]]
 name = "aoclib"
 version = "0.1.0"
-source = "git+https://github.com/coriolinus/aoclib.git#e8db88b8526a3b7310bf9aa2d09fedbf82cac16a"
+source = "git+https://github.com/coriolinus/aoclib.git#263686e6b3d462b636dd8a5a95057bafe7050bb8"
 dependencies = [
  "bitvec",
  "dirs",

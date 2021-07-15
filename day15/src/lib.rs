@@ -1,4 +1,8 @@
-use aoclib::geometry::{tile::DisplayWidth, Point};
+use aoclib::geometry::{
+    map::{ContextFrom, Traversable},
+    tile::DisplayWidth,
+    Point,
+};
 use std::{
     cmp::Ordering,
     collections::BTreeMap,
@@ -31,7 +35,7 @@ enum UnitType {
     Elf,
 }
 
-#[derive(Debug, Clone, Copy, parse_display::FromStr, parse_display::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, parse_display::FromStr, parse_display::Display)]
 enum Tile {
     #[display(".")]
     Empty,
@@ -43,6 +47,23 @@ enum Tile {
 
 impl DisplayWidth for Tile {
     const DISPLAY_WIDTH: usize = 1;
+}
+
+impl ContextFrom<Tile> for Traversable {
+    type Context = UnitPositions;
+
+    fn ctx_from(t: Tile, position: Point, context: &Self::Context) -> Self {
+        match t {
+            Tile::Empty => {
+                if context.contains_key(&position) {
+                    Traversable::Obstructed
+                } else {
+                    Traversable::Free
+                }
+            }
+            Tile::Wall | Tile::Occupied(_) => Traversable::Obstructed,
+        }
+    }
 }
 
 type InnerMap = aoclib::geometry::Map<Tile>;
@@ -80,6 +101,10 @@ where
 }
 
 impl Map {
+    fn load(input: &Path) -> Result<Self, Error> {
+        std::fs::read_to_string(input)?.parse()
+    }
+
     /// Extract the units from this map into their own data structure,
     /// leaving only the immovable tiles of the map.
     fn units(&mut self) -> Units {
@@ -169,7 +194,34 @@ impl Unit {
                 .any(|(&position, unit)| position != unit.position),
             "positions map must agree with itself"
         );
-        todo!()
+
+        // 1. If no targets, combat ends.
+        let all_targets: Vec<_> = self.targets(positions).collect();
+        if all_targets.is_empty() {
+            return (true, None, None);
+        }
+
+        // 2. If unit is in range of a target, do not move, but proceed to attack.
+        let mut adjacent_targets: Vec<_> = map
+            .orthogonal_adjacencies(self.position)
+            .filter(move |position| positions.contains_key(position))
+            .collect();
+        let move_to = adjacent_targets
+            .is_empty()
+            .then(|| self.compute_move(all_targets, map, positions))
+            .flatten();
+        if let Some(dest) = move_to {
+            // we've moved, recompute the targets
+            adjacent_targets = map
+                .orthogonal_adjacencies(dest)
+                .filter(move |position| positions.contains_key(position))
+                .collect()
+        }
+
+        // 3. Attack.
+        let attack = self.attack(&adjacent_targets, positions);
+
+        (false, move_to, attack)
     }
 
     /// Identify potential targets by their position.
@@ -178,6 +230,43 @@ impl Unit {
             .iter()
             .filter_map(move |(point, unit)| (unit.unit_type != self.unit_type).then(move || point))
             .copied()
+    }
+
+    // Move a step as specified in the rules. Returns the point to which we're moving.
+    fn compute_move(
+        &self,
+        targets: Vec<Point>,
+        map: &Map,
+        positions: &UnitPositions,
+    ) -> Option<Point> {
+        let targets = Self::in_range_and_empty(targets.into_iter(), map, positions).filter_map(
+            |destination| {
+                map.navigate_ctx(positions, self.position, destination)
+                    .map(|directions| (directions.len(), destination))
+            },
+        );
+        let mut steps_to_target = BTreeMap::<_, Vec<_>>::new();
+        for (steps_to, target) in targets {
+            steps_to_target.entry(steps_to).or_default().push(target);
+        }
+
+        todo!()
+    }
+
+    /// Attack per the instructions.
+    fn attack(&self, targets: &[Point], positions: &UnitPositions) -> Option<Point> {
+        todo!()
+    }
+
+    /// Positions adjacent to targets which are in range and empty.
+    fn in_range_and_empty<'a>(
+        target_positions: impl 'a + Iterator<Item = Point>,
+        map: &'a Map,
+        positions: &'a UnitPositions,
+    ) -> impl 'a + Iterator<Item = Point> {
+        target_positions
+            .flat_map(move |point| map.orthogonal_adjacencies(point))
+            .filter(move |&point| map[point] == Tile::Empty && !positions.contains_key(&point))
     }
 }
 
@@ -189,11 +278,14 @@ struct Units<'a> {
 
 impl<'a> Units<'a> {
     fn round(&mut self) {
+        self.units.sort_unstable();
         todo!()
     }
 }
 
 pub fn part1(input: &Path) -> Result<(), Error> {
+    let mut map = Map::load(input)?;
+    let mut units = map.units();
     unimplemented!()
 }
 
