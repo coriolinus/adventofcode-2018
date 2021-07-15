@@ -1,5 +1,5 @@
 use aoclib::geometry::{tile::DisplayWidth, Direction, Point};
-use std::{cmp::Ordering, collections::HashSet, fmt, path::Path, str::FromStr};
+use std::{cmp::Ordering, fmt, path::Path, str::FromStr};
 
 #[derive(Debug, Clone, Copy)]
 enum Track {
@@ -94,6 +94,7 @@ struct Cart {
     direction: Direction,
     position: Point,
     next_turn: Turn,
+    dead: bool,
 }
 
 impl Cart {
@@ -102,6 +103,7 @@ impl Cart {
             direction,
             position,
             next_turn: Turn::default(),
+            dead: false,
         }
     }
 }
@@ -114,6 +116,7 @@ impl Ord for Cart {
             .cmp(&other.position.y)
             .reverse()
             .then_with(|| self.position.x.cmp(&other.position.x))
+            .then_with(|| self.dead.cmp(&other.dead))
             .then_with(|| self.direction.deltas().cmp(&other.direction.deltas()))
             .then_with(|| self.next_turn.cmp(&other.next_turn))
     }
@@ -158,9 +161,8 @@ struct Carts<'a> {
 impl<'a> Carts<'a> {
     /// Advance a cart along its direction of motion by one tick.
     ///
-    /// Return `(old_position, new_position)`.
-    fn advance(cart: &mut Cart, map: &Map) -> (Point, Point) {
-        let old = cart.position;
+    /// Return `new_position`.
+    fn advance(cart: &mut Cart, map: &Map) -> Point {
         cart.direction = match (cart.direction, map.0[cart.position]) {
             (_, Track::Empty) => unreachable!("cart cannot travel off the rails"),
             (_, Track::Cart(_)) => unreachable!("carts most not be on the map"),
@@ -192,7 +194,7 @@ impl<'a> Carts<'a> {
             }
         };
         cart.position += cart.direction;
-        (old, cart.position)
+        cart.position
     }
 
     /// Advance the simulation by one step.
@@ -200,20 +202,52 @@ impl<'a> Carts<'a> {
     /// If two carts crash, return the points where the crash occurred.
     fn tick(&mut self) -> Vec<Point> {
         self.carts.sort_unstable();
-        let mut positions: HashSet<_> = self.carts.iter().map(|cart| cart.position).collect();
         let mut collisions = Vec::new();
-        for cart in self.carts.iter_mut() {
-            let (from, to) = Self::advance(cart, self.map);
-            positions.remove(&from);
-            if !positions.insert(to) {
-                // position was already present
-                collisions.push(to);
+
+        for idx in 0..self.carts.len() {
+            let new_position = {
+                let cart = &mut self.carts[idx];
+                if cart.dead {
+                    debug_assert!(collisions.contains(&cart.position));
+                    continue;
+                }
+                Self::advance(cart, self.map)
+            };
+
+            // there should only be one dead cart at any given point, but it can't hurt to check all of them.
+            // we have to collect these in advance to avoid a double-borrow of `self.carts`.
+            let collision_indices: Vec<_> = self
+                .carts
+                .iter()
+                .enumerate()
+                .filter_map(move |(collision_idx, cart)| {
+                    (idx != collision_idx && !cart.dead && cart.position == new_position)
+                        .then(move || collision_idx)
+                })
+                .collect();
+
+            for collision_index in collision_indices {
+                self.carts[collision_index].dead = true;
+                self.carts[idx].dead = true;
+                collisions.push(new_position);
             }
         }
+
+        // clean up the carts list to get rid of the dead
         if self.remove_collisions {
-            self.carts
-                .retain(|cart| !collisions.contains(&cart.position));
+            let old_cart_count = self.carts.len();
+
+            self.carts.retain(|cart| !cart.dead);
+
+            if !collisions.is_empty() {
+                debug_assert_eq!(
+                    old_cart_count - self.carts.len(),
+                    2 * collisions.len(),
+                    "each collision must remove two carts"
+                );
+            }
         }
+
         collisions
     }
 
@@ -270,7 +304,6 @@ pub fn part1(input: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-// known wrong: 12,7
 pub fn part2(input: &Path) -> Result<(), Error> {
     let mut map = Map::load(input)?;
     let mut carts = map.extract_carts();
