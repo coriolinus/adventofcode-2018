@@ -545,6 +545,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "day15"
+version = "0.1.0"
+dependencies = [
+ "aoclib",
+ "color-eyre",
+ "parse-display 0.5.0",
+ "structopt",
+ "thiserror",
+]
+
+[[package]]
 name = "digest"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
