@@ -564,6 +564,9 @@ dependencies = [
  "enum-iterator",
  "maplit",
  "parse-display 0.5.1",
+ "pest",
+ "pest_consume",
+ "pest_derive",
  "structopt",
  "thiserror",
 ]
