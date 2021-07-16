@@ -1,6 +1,11 @@
 use enum_iterator::IntoEnumIterator;
 use pest_consume::{match_nodes, Parser};
-use std::{convert::TryInto, path::Path, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+    path::Path,
+    str::FromStr,
+};
 
 #[derive(Parser)]
 #[grammar = "parser.pest"]
@@ -60,7 +65,7 @@ impl InputParser {
 
     fn input(input: Node) -> ParseResult<Input> {
         Ok(match_nodes!(input.into_children();
-            [samples(samples), example_program(_example_program), EOI(_eoi)] => Input { samples, _example_program }
+            [samples(samples), example_program(example_program), EOI(_eoi)] => Input { samples, example_program }
         ))
     }
 }
@@ -79,7 +84,7 @@ impl InputParser {
 
 struct Input {
     samples: Vec<Sample>,
-    _example_program: Vec<UnknownInstruction>,
+    example_program: Vec<UnknownInstruction>,
 }
 
 type Value = u32;
@@ -157,32 +162,41 @@ impl UnknownInstruction {
         let UnknownInstruction { a, b, c, .. } = self;
         Instruction { opcode, a, b, c }
     }
+
+    fn assume_with(self, map: &HashMap<Value, Opcode>) -> Instruction {
+        let opcode = map[&self.opcode];
+        self.assume(opcode)
+    }
 }
 
 type Registers = [Value; 4];
 
+#[derive(Default, Debug)]
 struct Cpu {
     registers: Registers,
 }
 
 impl Cpu {
-    fn new(registers: Registers) -> Self {
-        Self { registers }
+    fn from_registers(registers: Registers) -> Self {
+        Self {
+            registers,
+            ..Self::default()
+        }
     }
 
-    fn register(&self, index: Value) -> Result<&Value, CpuError> {
+    fn register(&self, index: Value) -> Result<&Value, Error> {
         self.registers
             .get(index as usize)
-            .ok_or(CpuError::InvalidRegister)
+            .ok_or(Error::InvalidRegister)
     }
 
-    fn register_mut(&mut self, index: Value) -> Result<&mut Value, CpuError> {
+    fn register_mut(&mut self, index: Value) -> Result<&mut Value, Error> {
         self.registers
             .get_mut(index as usize)
-            .ok_or(CpuError::InvalidRegister)
+            .ok_or(Error::InvalidRegister)
     }
 
-    fn execute(&mut self, instruction: Instruction) -> Result<(), CpuError> {
+    fn execute(&mut self, instruction: Instruction) -> Result<(), Error> {
         use Opcode::*;
 
         let value = match instruction.opcode {
@@ -256,7 +270,7 @@ impl Sample {
     fn behaves_like(self) -> impl Iterator<Item = Opcode> {
         Opcode::into_enum_iter().filter_map(move |opcode| {
             let instruction = self.unknown_instruction.assume(opcode);
-            let mut cpu = Cpu::new(self.before.into());
+            let mut cpu = Cpu::from_registers(self.before.into());
             cpu.execute(instruction).ok()?;
             let after: [Value; 4] = self.after.into();
             (cpu.registers == after).then(move || opcode)
@@ -273,10 +287,32 @@ impl FromStr for Sample {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-enum CpuError {
-    #[error("requested a register which does not exist")]
-    InvalidRegister,
+fn discover_opcodes_map(samples: &[Sample]) -> Result<HashMap<Value, Opcode>, Error> {
+    let mut unknown_opcodes: HashSet<_> = Opcode::into_enum_iter().collect();
+    let mut opcodes_map = HashMap::new();
+
+    loop {
+        let n_known = opcodes_map.len();
+        for sample in samples {
+            let potential_opcodes: Vec<_> = sample
+                .behaves_like()
+                .filter(|opcode| !unknown_opcodes.contains(opcode))
+                .take(2)
+                .collect();
+            if let [opcode] = potential_opcodes.as_slice() {
+                unknown_opcodes.remove(opcode);
+                opcodes_map.insert(sample.unknown_instruction.opcode, *opcode);
+            }
+        }
+        if unknown_opcodes.is_empty() {
+            return Ok(opcodes_map);
+        }
+        if n_known == opcodes_map.len() {
+            dbg!(&opcodes_map);
+            // we haven't learned anything this iteration
+            return Err(Error::NoSolution);
+        }
+    }
 }
 
 pub fn part1(input: &Path) -> Result<(), Error> {
@@ -293,7 +329,22 @@ pub fn part1(input: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn part2(_input: &Path) -> Result<(), Error> {
+pub fn part2(input: &Path) -> Result<(), Error> {
+    let input = InputParser::parse_file(input)?;
+    let opcodes_map = discover_opcodes_map(&input.samples)?;
+    let instructions = input
+        .example_program
+        .into_iter()
+        .map(|unknown_instruction| unknown_instruction.assume_with(&opcodes_map));
+
+    // no need for an instruction pointer or internal instructions because this CPU has no jumps
+    let mut cpu = Cpu::default();
+    for instruction in instructions {
+        cpu.execute(instruction)?;
+    }
+
+    println!("value in register 0: {}", cpu.registers[0]);
+
     unimplemented!()
 }
 
@@ -305,6 +356,8 @@ pub enum Error {
     Parse(#[from] pest_consume::Error<Rule>),
     #[error("No solution found")]
     NoSolution,
+    #[error("requested a register which does not exist")]
+    InvalidRegister,
 }
 
 #[cfg(test)]
