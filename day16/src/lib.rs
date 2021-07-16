@@ -258,16 +258,28 @@ fn discover_opcodes_map(samples: &[Sample]) -> Result<HashMap<Value, Opcode>, Er
     loop {
         let n_known = opcodes_map.len();
         for sample in samples {
+            // if we've already figured this one out, move on
+            if opcodes_map.contains_key(&sample.unknown_instruction.opcode) {
+                continue;
+            }
+
             let potential_opcodes: Vec<_> = sample
                 .behaves_like()
-                .filter(|opcode| !unknown_opcodes.contains(opcode))
+                .filter(|opcode| unknown_opcodes.contains(opcode))
                 .take(2)
                 .collect();
+
+            debug_assert_ne!(
+                potential_opcodes.len(),
+                0,
+                "all samples must map to at least one opcode"
+            );
             if let [opcode] = potential_opcodes.as_slice() {
                 unknown_opcodes.remove(opcode);
                 opcodes_map.insert(sample.unknown_instruction.opcode, *opcode);
             }
         }
+
         if unknown_opcodes.is_empty() {
             return Ok(opcodes_map);
         }
@@ -308,8 +320,7 @@ pub fn part2(input: &Path) -> Result<(), Error> {
     }
 
     println!("value in register 0: {}", cpu.registers[0]);
-
-    unimplemented!()
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
