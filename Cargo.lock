@@ -415,7 +415,7 @@ version = "0.1.0"
 dependencies = [
  "aoclib",
  "color-eyre",
- "parse-display 0.5.0",
+ "parse-display 0.5.1",
  "structopt",
  "thiserror",
 ]
@@ -426,7 +426,7 @@ version = "0.1.0"
 dependencies = [
  "aoclib",
  "color-eyre",
- "parse-display 0.5.0",
+ "parse-display 0.5.1",
  "structopt",
  "thiserror",
 ]
@@ -448,7 +448,7 @@ version = "0.1.0"
 dependencies = [
  "aoclib",
  "color-eyre",
- "parse-display 0.5.0",
+ "parse-display 0.5.1",
  "structopt",
  "thiserror",
 ]
@@ -480,7 +480,7 @@ version = "0.1.0"
 dependencies = [
  "aoclib",
  "color-eyre",
- "parse-display 0.5.0",
+ "parse-display 0.5.1",
  "structopt",
  "thiserror",
 ]
@@ -550,7 +550,20 @@ version = "0.1.0"
 dependencies = [
  "aoclib",
  "color-eyre",
- "parse-display 0.5.0",
+ "parse-display 0.5.1",
+ "structopt",
+ "thiserror",
+]
+
+[[package]]
+name = "day16"
+version = "0.1.0"
+dependencies = [
+ "aoclib",
+ "color-eyre",
+ "enum-iterator",
+ "maplit",
+ "parse-display 0.5.1",
  "structopt",
  "thiserror",
 ]
@@ -603,6 +616,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80df024fbc5ac80f87dfef0d9f5209a252f2a497f7f42944cff24d8253cac065"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "enum-iterator"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c79a6321a1197d7730510c7e3f6cb80432dfefecb32426de8cea0aa19b4bb8d7"
+dependencies = [
+ "enum-iterator-derive",
+]
+
+[[package]]
+name = "enum-iterator-derive"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e94aa31f7c0dc764f57896dc615ddd76fc13b0d5dca7eb6cc5e018a5a09ec06"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1250,12 +1283,12 @@ dependencies = [
 
 [[package]]
 name = "parse-display"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc7e98ea043e0880940ef455c6c6e5710b4f670b4f0aeff6edf320bb01143fe9"
+checksum = "8f17011e14e6b831ed3aeab847a62fd338aee88539fcc99f23ce5ba98feba328"
 dependencies = [
  "once_cell",
- "parse-display-derive 0.5.0",
+ "parse-display-derive 0.5.1",
  "regex",
 ]
 
@@ -1275,9 +1308,9 @@ dependencies = [
 
 [[package]]
 name = "parse-display-derive"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "962e8dc54ebea1392eb2f36a205f2efa9437bfe8e95d7a91f070044c363c9684"
+checksum = "ad30302271e65d661910580baf25e874cd92c4595ddbed74d1ec9b2fdfaae64b"
 dependencies = [
  "once_cell",
  "proc-macro2",
