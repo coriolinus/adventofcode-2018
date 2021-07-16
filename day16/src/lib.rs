@@ -178,10 +178,7 @@ struct Cpu {
 
 impl Cpu {
     fn from_registers(registers: Registers) -> Self {
-        Self {
-            registers,
-            ..Self::default()
-        }
+        Self { registers }
     }
 
     fn register(&self, index: Value) -> Result<&Value, Error> {
@@ -234,9 +231,9 @@ impl Sample {
     fn behaves_like(self) -> impl Iterator<Item = Opcode> {
         Opcode::into_enum_iter().filter_map(move |opcode| {
             let instruction = self.unknown_instruction.assume(opcode);
-            let mut cpu = Cpu::from_registers(self.before.into());
+            let mut cpu = Cpu::from_registers(self.before);
             cpu.execute(instruction).ok()?;
-            let after: [Value; 4] = self.after.into();
+            let after: [Value; 4] = self.after;
             (cpu.registers == after).then(move || opcode)
         })
     }
