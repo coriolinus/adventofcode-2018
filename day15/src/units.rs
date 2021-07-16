@@ -25,24 +25,17 @@ impl<'a> Units<'a> {
         // we need to update dead units later.
         for unit_idx in 0..self.units.len() {
             let unit = self.units[unit_idx];
-            eprint!(
-                "Considering {:?} at ({}, {}) with {} hit points... ",
-                unit.unit_type, unit.position.x, unit.position.y, unit.hit_points
-            );
             // dead units do nothing
             if unit.hit_points <= 0 {
-                eprintln!("which is dead.");
                 continue;
             }
 
             let (end_combat, maybe_move, maybe_attack) = unit.turn(self.map, &positions);
             // handle end of combat
             if end_combat {
-                eprintln!("no live enemies found; ending combat");
                 combat_abort = true;
                 break;
             }
-            eprintln!();
             // handle movement
             if let Some(move_to) = maybe_move {
                 // we need to remove the unit from the posititions list before moving,
@@ -52,7 +45,6 @@ impl<'a> Units<'a> {
                     1,
                     "unit can only move one tile"
                 );
-                eprintln!("  moving to ({}, {})...", move_to.x, move_to.y);
                 // take an owned version of the unit for re-adding
                 let mut unit = positions
                     .remove(&unit.position)
@@ -62,23 +54,14 @@ impl<'a> Units<'a> {
             }
             // handle attacks
             if let Some(attack) = maybe_attack {
-                eprintln!(
-                    "  attacking target at ({}, {}) with power {}",
-                    attack.x, attack.y, unit.attack_power
-                );
                 let maybe_target = positions.remove(&attack);
-                if maybe_target.is_none() {
-                    dbg!(attack, unit, &self.units);
-                }
                 let mut target = maybe_target.expect("positions always correspond to units");
                 target.hit_points -= unit.attack_power;
-                eprintln!("  -> {:?}", target);
 
                 // note that scanning for targets by position is expensive, so we only
                 // do it when the target dies. We have to update the units list entirely
                 // at the end of the function anyway.
                 if target.hit_points <= 0 {
-                    eprintln!("  target dies!");
                     for unit_idx in 0..self.units.len() {
                         if self.units[unit_idx].position == target.position {
                             self.units[unit_idx].hit_points = target.hit_points;
@@ -100,9 +83,22 @@ impl<'a> Units<'a> {
             .filter(|unit| unit.hit_points > 0)
             .collect();
 
-        eprintln!("{} units survive at round's end", self.units.len());
-
         combat_abort
+    }
+
+    pub fn outcome(&self, full_rounds: usize) -> u32 {
+        assert!(
+            self.units
+                .windows(2)
+                .all(|window| window[0].unit_type == window[1].unit_type),
+            "outcome only reliable when one side is annihilated"
+        );
+        debug_assert!(
+            self.units.iter().all(|unit| unit.hit_points > 0),
+            "all remaining units must be live"
+        );
+        let hit_point_sum: u32 = self.units.iter().map(|unit| unit.hit_points as u32).sum();
+        full_rounds as u32 * hit_point_sum
     }
 }
 

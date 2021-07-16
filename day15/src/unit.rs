@@ -144,12 +144,11 @@ impl Unit {
     ) -> Option<Point> {
         // identify squares that are in range of targets adn empty
         // determine which of them can be reached without obstruction
-        let targets = Self::in_range_and_empty(targets.into_iter(), map, positions).filter_map(
-            |destination| {
+        let targets =
+            in_range_and_empty(targets.into_iter(), map, positions).filter_map(|destination| {
                 map.navigate_ctx(positions, self.position, destination)
                     .map(|directions| (directions.len(), destination))
-            },
-        );
+            });
         // determine the destination which can be reached in fewest steps
         let mut steps_to_target = BTreeMap::<_, Vec<_>>::new();
         for (steps_to, target) in targets {
@@ -157,7 +156,7 @@ impl Unit {
         }
         let (dist, mut nearest_targets) = steps_to_target.into_iter().next()?;
         // if multiple are tied for least steps, choose by reading order
-        nearest_targets.sort_unstable();
+        sort_unstable_book_order(&mut nearest_targets);
         let destination = *nearest_targets.first()?;
         // determine which path to the destination is shortest by reading order
         let first_step = std::array::IntoIter::new([
@@ -187,19 +186,24 @@ impl Unit {
     /// d. ~~If target's hit points are 0 or lower, it dies; remove it from play.~~
     fn attack(&self, mut targets: Vec<Point>, positions: &UnitPositions) -> Option<Point> {
         // first sort by reading order, then (stably) by hit points, so hit points have higher priority
-        targets.sort_unstable();
+        sort_unstable_book_order(&mut targets);
         targets.sort_by_key(|target| positions[target].hit_points);
         targets.first().copied()
     }
+}
 
-    /// Positions adjacent to targets which are in range and empty.
-    fn in_range_and_empty<'a>(
-        target_positions: impl 'a + Iterator<Item = Point>,
-        map: &'a Map,
-        positions: &'a UnitPositions,
-    ) -> impl 'a + Iterator<Item = Point> {
-        target_positions
-            .flat_map(move |point| map.orthogonal_adjacencies(point))
-            .filter(move |&point| map[point] == Tile::Empty && !positions.contains_key(&point))
-    }
+/// Positions adjacent to targets which are in range and empty.
+fn in_range_and_empty<'a>(
+    target_positions: impl 'a + Iterator<Item = Point>,
+    map: &'a Map,
+    positions: &'a UnitPositions,
+) -> impl 'a + Iterator<Item = Point> {
+    target_positions
+        .flat_map(move |point| map.orthogonal_adjacencies(point))
+        .filter(move |&point| map[point] == Tile::Empty && !positions.contains_key(&point))
+}
+
+/// Sort points in book order
+fn sort_unstable_book_order(points: &mut [Point]) {
+    points.sort_unstable_by_key(|point| (std::cmp::Reverse(point.y), point.x));
 }
