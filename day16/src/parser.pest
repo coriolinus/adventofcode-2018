@@ -1,0 +1,16 @@
+// Fundamentals
+number = { ASCII_DIGIT+ }
+whitespace = _{ (" " | " ")* }
+newline = _{"\n"}
+
+// Before: [0, 2, 0, 2]
+// 6 0 1 1
+// After:  [0, 1, 0, 2]
+registers = { "[" ~ (number ~ "," ~ whitespace){3} ~ number ~ whitespace ~ "]" }
+instruction = { (number ~ " "+){3} ~ number }
+sample = { ^"before:" ~ whitespace ~ registers ~ newline ~ instruction ~ newline ~ ^"after:" ~ whitespace ~ registers}
+
+samples = { (sample ~ newline+)* }
+example_program = { (instruction ~ newline)* }
+
+input = { SOI ~ samples ~ example_program ~ EOI }
