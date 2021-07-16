@@ -16,20 +16,7 @@ struct Input {
 type Value = u32;
 
 /// Opcodes control the behavior of an instruction and how the inputs are interpreted.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    parse_display::FromStr,
-    parse_display::Display,
-    IntoEnumIterator,
-)]
-#[display(style = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, IntoEnumIterator)]
 enum Opcode {
     // Addition
     Addr,
@@ -64,18 +51,7 @@ struct Instruction {
     c: Value,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    parse_display::FromStr,
-    parse_display::Display,
-)]
-#[display("{opcode} {a} {b} {c}")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct UnknownInstruction {
     opcode: Value,
     a: Value,
