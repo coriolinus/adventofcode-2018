@@ -1,4 +1,4 @@
-use crate::{Map, Tile, Unit, UnitPositions};
+use crate::{unit_type::UnitType, HitPoints, Map, Tile, Unit, UnitPositions};
 use std::fmt;
 
 #[derive(Clone)]
@@ -99,6 +99,13 @@ impl<'a> Units<'a> {
         );
         let hit_point_sum: u32 = self.units.iter().map(|unit| unit.hit_points as u32).sum();
         full_rounds as u32 * hit_point_sum
+    }
+
+    pub fn set_elf_attack_power(&mut self, attack_power: HitPoints) {
+        self.units
+            .iter_mut()
+            .filter(|unit| unit.unit_type == UnitType::Elf)
+            .for_each(|unit| unit.attack_power = attack_power);
     }
 }
 
