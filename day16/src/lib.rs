@@ -4,6 +4,7 @@ use enum_iterator::IntoEnumIterator;
 use input_parser::InputParser;
 use std::{
     collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut, Index},
     path::Path,
     str::FromStr,
 };
@@ -74,25 +75,44 @@ impl UnknownInstruction {
 type Registers = [Value; 4];
 
 #[derive(Default, Debug)]
-struct Cpu {
-    registers: Registers,
+struct Cpu(Registers);
+
+impl Deref for Cpu {
+    type Target = Registers;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Cpu {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<I> Index<I> for Cpu
+where
+    Registers: Index<I>,
+{
+    type Output = <Registers as Index<I>>::Output;
+
+    fn index(&self, index: I) -> &Self::Output {
+        self.0.index(index)
+    }
 }
 
 impl Cpu {
     fn from_registers(registers: Registers) -> Self {
-        Self { registers }
+        Self(registers)
     }
 
     fn register(&self, index: Value) -> Result<&Value, Error> {
-        self.registers
-            .get(index as usize)
-            .ok_or(Error::InvalidRegister)
+        self.get(index as usize).ok_or(Error::InvalidRegister)
     }
 
     fn register_mut(&mut self, index: Value) -> Result<&mut Value, Error> {
-        self.registers
-            .get_mut(index as usize)
-            .ok_or(Error::InvalidRegister)
+        self.get_mut(index as usize).ok_or(Error::InvalidRegister)
     }
 
     fn execute(&mut self, instruction: Instruction) -> Result<(), Error> {
@@ -136,7 +156,7 @@ impl Sample {
             let mut cpu = Cpu::from_registers(self.before);
             cpu.execute(instruction).ok()?;
             let after: [Value; 4] = self.after;
-            (cpu.registers == after).then(move || opcode)
+            (*cpu == after).then(move || opcode)
         })
     }
 }
@@ -217,7 +237,7 @@ pub fn part2(input: &Path) -> Result<(), Error> {
         cpu.execute(instruction)?;
     }
 
-    println!("value in register 0: {}", cpu.registers[0]);
+    println!("value in register 0: {}", cpu[0]);
     Ok(())
 }
 
