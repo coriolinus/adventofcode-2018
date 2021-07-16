@@ -210,48 +210,12 @@ impl Cpu {
             Bori => self.register(instruction.a)? | instruction.b,
             Setr => *self.register(instruction.a)?,
             Seti => instruction.a,
-            Gtir => {
-                if instruction.a > *self.register(instruction.b)? {
-                    1
-                } else {
-                    0
-                }
-            }
-            Gtri => {
-                if *self.register(instruction.a)? > instruction.b {
-                    1
-                } else {
-                    0
-                }
-            }
-            Gtrr => {
-                if *self.register(instruction.a)? > *self.register(instruction.b)? {
-                    1
-                } else {
-                    0
-                }
-            }
-            Eqir => {
-                if instruction.a == *self.register(instruction.b)? {
-                    1
-                } else {
-                    0
-                }
-            }
-            Eqri => {
-                if *self.register(instruction.a)? == instruction.b {
-                    1
-                } else {
-                    0
-                }
-            }
-            Eqrr => {
-                if *self.register(instruction.a)? == *self.register(instruction.b)? {
-                    1
-                } else {
-                    0
-                }
-            }
+            Gtir => (instruction.a > *self.register(instruction.b)?) as Value,
+            Gtri => (*self.register(instruction.a)? > instruction.b) as Value,
+            Gtrr => (*self.register(instruction.a)? > *self.register(instruction.b)?) as Value,
+            Eqir => (instruction.a == *self.register(instruction.b)?) as Value,
+            Eqri => (*self.register(instruction.a)? == instruction.b) as Value,
+            Eqrr => (*self.register(instruction.a)? == *self.register(instruction.b)?) as Value,
         };
         *self.register_mut(instruction.c)? = value;
 
