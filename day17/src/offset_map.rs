@@ -39,6 +39,11 @@ impl OffsetMap<crate::Tile> {
         debug_assert!(min.x <= max.x);
         debug_assert!(min.y <= max.y);
 
+        // adjust the x values to provide one tile of margin at the sides
+        // this ensures that we never fail to account for some water flow
+        min.x -= 1;
+        max.x += 1;
+
         let width = (max.x - min.x + 1) as usize;
         let height = (max.y - min.y + 1) as usize;
         let offset = min;
@@ -50,7 +55,11 @@ impl OffsetMap<crate::Tile> {
             }
         }
 
-        OffsetMap { offset, map }
+        // AoC is upside down
+        OffsetMap {
+            offset,
+            map: map.flip_vertical(),
+        }
     }
 }
 
@@ -72,7 +81,7 @@ impl<Tile> OffsetMap<Tile> {
     }
 
     pub fn high_x(&self) -> i32 {
-        self.offset.x + self.width() as i32
+        self.offset.x + self.width() as i32 - 1
     }
 
     pub fn low_y(&self) -> i32 {
@@ -80,11 +89,19 @@ impl<Tile> OffsetMap<Tile> {
     }
 
     pub fn high_y(&self) -> i32 {
-        self.offset.y + self.height() as i32
+        self.offset.y + self.height() as i32 - 1
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Tile> {
         self.map.iter()
+    }
+
+    pub fn in_bounds(&self, point: Point) -> bool {
+        self.map.in_bounds(point - self.offset)
+    }
+
+    pub fn project(&self, origin: Point, dx: i32, dy: i32) -> impl '_ + Iterator<Item = Point> {
+        self.map.project(origin - self.offset, dx, dy)
     }
 }
 
@@ -107,8 +124,6 @@ where
     Tile: fmt::Display + DisplayWidth + Clone + Default,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // AoC origin is in upper left, not lower left
-        let map = self.map.flip_vertical();
-        write!(f, "{}", map)
+        self.map.fmt(f)
     }
 }
