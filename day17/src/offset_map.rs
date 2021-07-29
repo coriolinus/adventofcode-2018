@@ -67,12 +67,24 @@ impl<Tile> OffsetMap<Tile> {
         self.offset
     }
 
-    pub fn top_left(&self) -> Point {
-        self.map.top_left() + self.offset
+    pub fn low_x(&self) -> i32 {
+        self.offset.x
     }
 
-    pub fn top_right(&self) -> Point {
-        self.map.top_right() + self.offset
+    pub fn high_x(&self) -> i32 {
+        self.offset.x + self.width() as i32
+    }
+
+    pub fn low_y(&self) -> i32 {
+        self.offset.y
+    }
+
+    pub fn high_y(&self) -> i32 {
+        self.offset.y + self.height() as i32
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Tile> {
+        self.map.iter()
     }
 }
 
@@ -95,8 +107,6 @@ where
     Tile: fmt::Display + DisplayWidth + Clone + Default,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "offset: ({}, {})", self.offset.x, self.offset.y)?;
-        writeln!(f, "dimentions: ({}, {})", self.width(), self.height())?;
         // AoC origin is in upper left, not lower left
         let map = self.map.flip_vertical();
         write!(f, "{}", map)
