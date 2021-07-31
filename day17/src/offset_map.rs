@@ -101,7 +101,7 @@ impl<Tile> OffsetMap<Tile> {
     }
 
     pub fn project(&self, origin: Point, dx: i32, dy: i32) -> impl '_ + Iterator<Item = Point> {
-        self.map.project(origin - self.offset, dx, dy)
+        self.map.project(origin + self.offset, dx, dy)
     }
 }
 
