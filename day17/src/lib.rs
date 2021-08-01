@@ -3,10 +3,21 @@ mod offset_map;
 pub use offset_map::OffsetMap;
 
 use aoclib::{
-    geometry::{tile::DisplayWidth, Direction, Point},
+    geometry::{
+        tile::{DisplayWidth, ToRgb},
+        Direction, Point,
+    },
     parse,
 };
-use std::{collections::VecDeque, convert::TryInto, path::Path, rc::Rc};
+use std::{
+    collections::VecDeque,
+    convert::TryInto,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+
+#[cfg(feature = "animate")]
+use std::time::Duration;
 
 const WATER_X: i32 = 500;
 
@@ -63,6 +74,17 @@ impl Default for Tile {
     }
 }
 
+impl ToRgb for Tile {
+    fn to_rgb(&self) -> [u8; 3] {
+        match self {
+            Tile::Sand => [250, 231, 180],
+            Tile::Clay => [94, 85, 59],
+            Tile::WaterPassthrough => [224, 255, 252],
+            Tile::Water => [54, 88, 181],
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Wavefront {
     position: Point,
@@ -71,9 +93,38 @@ struct Wavefront {
 }
 
 /// Fill the map from an infinite water source located at the given x position and max `y`.
-fn fill_with_water(water_x: i32, mut map: OffsetMap<Tile>) -> Result<OffsetMap<Tile>, Error> {
+fn fill_with_water(
+    water_x: i32,
+    mut map: OffsetMap<Tile>,
+    animation_path: Option<PathBuf>,
+) -> Result<OffsetMap<Tile>, Error> {
     if water_x < map.low_x() || water_x > map.high_x() {
         return Err(Error::WaterSourceOutOfBounds);
+    }
+
+    #[cfg(not(feature = "animate"))]
+    if animation_path.is_some() {
+        return Err(Error::MissingFeature);
+    }
+
+    #[cfg(feature = "animate")]
+    let animation = animation_path.map(|path| {
+        map.prepare_animation(&path, Duration::from_millis(300))
+            .ok()
+    });
+
+    macro_rules! frame {
+        () => {
+            #[cfg(feature = "animate")]
+            if let Some(ref mut animation) = animation {
+                animation.write_frame(&map, false)?;
+            }
+        };
+    }
+
+    // write initial frames
+    for _ in 0..6 {
+        frame!();
     }
 
     // The basic approach here is a set of cursors which follow the propagation
@@ -96,6 +147,7 @@ fn fill_with_water(water_x: i32, mut map: OffsetMap<Tile>) -> Result<OffsetMap<T
     });
 
     while let Some(wavefront) = wavefronts.pop_front() {
+        frame!();
         let wavefront = Rc::new(wavefront);
 
         // wet the sand
@@ -206,10 +258,10 @@ fn fill_with_water(water_x: i32, mut map: OffsetMap<Tile>) -> Result<OffsetMap<T
 }
 
 // known wrong, too low: 1226
-pub fn part1(input: &Path, show_map: bool) -> Result<(), Error> {
+pub fn part1(input: &Path, show_map: bool, animation_path: Option<PathBuf>) -> Result<(), Error> {
     let veins: Vec<Vein> = parse(input)?.collect();
     let map = OffsetMap::new(&veins);
-    let map = fill_with_water(WATER_X, map)?;
+    let map = fill_with_water(WATER_X, map, animation_path)?;
     let wet_tiles = map.iter().filter(|tile| tile.is_wet()).count();
     println!("n wet tiles: {}", wet_tiles);
     if show_map {
@@ -230,4 +282,6 @@ pub enum Error {
     WaterSourceOutOfBounds,
     #[error("Water flowed over map edge during calculation")]
     WaterFlowedOverEdge,
+    #[error("You set an animation path but did not compile with 'animation' feature")]
+    MissingFeature,
 }

@@ -10,3 +10,7 @@ color-eyre = "0.5.10"
 parse-display = "0.5.1"
 structopt = "0.3.21"
 thiserror = "1.0.22"
+
+[features]
+default = []
+animate = ["aoclib/map-render"]

@@ -25,6 +25,11 @@ struct RunArgs {
     /// show the map
     #[structopt(long)]
     show_map: bool,
+
+    /// animate the map filling process into the file at this location
+    #[cfg(feature = "animate")]
+    #[structopt(long, parse(from_os_str))]
+    animate: Option<PathBuf>,
 }
 
 impl RunArgs {
@@ -48,7 +53,10 @@ fn main() -> Result<()> {
     let input_path = args.input()?;
 
     if !args.no_part1 {
-        part1(&input_path, args.show_map)?;
+        #[cfg(feature = "animate")]
+        part1(&input_path, args.show_map, args.animate)?;
+        #[cfg(not(feature = "animate"))]
+        part1(&input_path, args.show_map, None)?;
     }
     if args.part2 {
         part2(&input_path)?;
