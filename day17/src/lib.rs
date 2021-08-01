@@ -43,6 +43,16 @@ pub(crate) enum Tile {
     Water,
 }
 
+impl Tile {
+    pub fn is_dry(&self) -> bool {
+        matches!(*self, Tile::Sand | Tile::Clay)
+    }
+
+    pub fn is_wet(&self) -> bool {
+        !self.is_dry()
+    }
+}
+
 impl DisplayWidth for Tile {
     const DISPLAY_WIDTH: usize = 1;
 }
@@ -122,7 +132,8 @@ fn fill_with_water(water_x: i32, mut map: OffsetMap<Tile>) -> Result<OffsetMap<T
                             // passthroughs are uninteresting and common; do nothing
                             Tile::WaterPassthrough => {}
                             Tile::Water => {
-                                unreachable!("water propagation should never be incomplete")
+                                eprintln!("reached unexpected water at ({}, {})", point.x, point.y);
+                                break;
                             }
                         }
                     }
@@ -154,6 +165,9 @@ fn fill_with_water(water_x: i32, mut map: OffsetMap<Tile>) -> Result<OffsetMap<T
                         }
                     }
                 }
+
+                // in any case, clay tiles have no normal successors
+                continue;
             }
         }
 
@@ -178,25 +192,25 @@ fn fill_with_water(water_x: i32, mut map: OffsetMap<Tile>) -> Result<OffsetMap<T
                 map.in_bounds(successor),
                 "water must not flow over the edge"
             );
-            wavefronts.push_back(Wavefront {
-                position: successor,
-                prev_point: Some(wavefront.position),
-                backtrack: wavefront.backtrack.clone(),
-            });
+            if map[successor].is_dry() {
+                wavefronts.push_back(Wavefront {
+                    position: successor,
+                    prev_point: Some(wavefront.position),
+                    backtrack: wavefront.backtrack.clone(),
+                });
+            }
         }
     }
 
     Ok(map)
 }
 
+// known wrong, too low: 1226
 pub fn part1(input: &Path, show_map: bool) -> Result<(), Error> {
     let veins: Vec<Vein> = parse(input)?.collect();
     let map = OffsetMap::new(&veins);
     let map = fill_with_water(WATER_X, map)?;
-    let wet_tiles = map
-        .iter()
-        .filter(|tile| matches!(*tile, Tile::WaterPassthrough | Tile::Water))
-        .count();
+    let wet_tiles = map.iter().filter(|tile| tile.is_wet()).count();
     println!("n wet tiles: {}", wet_tiles);
     if show_map {
         println!("{}", map);
