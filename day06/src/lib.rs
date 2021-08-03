@@ -33,12 +33,12 @@ fn make_map(points: &[Point]) -> Map {
 fn fill_map(map: &mut Map, points: &[Point]) -> Result<(), Error> {
     match points.len() {
         0 => return Err(Error::NoSolution),
-        1 => map.for_each_mut(|tile| {
+        1 => map.iter_mut().for_each(|(_position, tile)| {
             if !matches!(tile, Tile::Point(_)) {
                 *tile = Tile::Region(0)
             }
         }),
-        _ => map.for_each_point_mut(|tile, tile_point| {
+        _ => map.iter_mut().for_each(|(tile_point, tile)| {
             if *tile == Tile::Empty {
                 let mut distances = Vec::with_capacity(points.len());
 
@@ -61,9 +61,10 @@ fn fill_map(map: &mut Map, points: &[Point]) -> Result<(), Error> {
             }
         }),
     }
-    debug_assert!(map
-        .iter()
-        .all(|&tile| matches!(tile, Tile::Point(_) | Tile::Region(_) | Tile::Equidistant)));
+    debug_assert!(map.iter().all(|(_point, &tile)| matches!(
+        tile,
+        Tile::Point(_) | Tile::Region(_) | Tile::Equidistant
+    )));
     Ok(())
 }
 
@@ -77,7 +78,7 @@ fn largest_non_infinite_region(map: &Map) -> Result<usize, Error> {
         .collect();
 
     let mut region_areas: HashMap<usize, usize> = HashMap::new();
-    for tile in map.iter().copied() {
+    for tile in map.iter().map(|(_point, tile)| tile).copied() {
         if let Tile::Point(idx) | Tile::Region(idx) = tile {
             if !infinite_regions.contains(&idx) {
                 *region_areas.entry(idx).or_default() += 1;
@@ -95,20 +96,15 @@ fn largest_non_infinite_region(map: &Map) -> Result<usize, Error> {
 }
 
 fn size_of_safe_region(map: &Map, points: &[Point]) -> usize {
-    let mut count = 0;
-
-    map.for_each_point(|_tile, point| {
-        if points
-            .iter()
-            .map(|&coord| (coord - point).manhattan())
-            .sum::<i32>()
-            < SAFETY_THRESHOLD
-        {
-            count += 1;
-        }
-    });
-
-    count
+    map.iter()
+        .filter(|&(point, _tile)| {
+            points
+                .iter()
+                .map(|&coord| (coord - point).manhattan())
+                .sum::<i32>()
+                < SAFETY_THRESHOLD
+        })
+        .count()
 }
 
 pub fn part1(input: &Path) -> Result<(), Error> {

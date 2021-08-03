@@ -1,7 +1,3 @@
-mod offset_map;
-
-pub use offset_map::OffsetMap;
-
 use aoclib::{
     geometry::{
         tile::{DisplayWidth, ToRgb},
@@ -85,6 +81,44 @@ impl ToRgb for Tile {
     }
 }
 
+type Map = aoclib::geometry::Map<Tile>;
+
+fn make_map(veins: &[Vein]) -> Map {
+    let mut min = Point::new(i32::MAX, i32::MAX);
+    let mut max = Point::new(i32::MIN, i32::MIN);
+
+    for vein in veins {
+        for point in vein.points() {
+            min.x = min.x.min(point.x);
+            min.y = min.y.min(point.y);
+            max.x = max.x.max(point.x);
+            max.y = max.y.max(point.y);
+        }
+    }
+
+    debug_assert!(min.x <= max.x);
+    debug_assert!(min.y <= max.y);
+
+    // adjust the x values to provide one tile of margin at the sides
+    // this ensures that we never fail to account for some water flow
+    min.x -= 1;
+    max.x += 1;
+
+    let width = (max.x - min.x + 1) as usize;
+    let height = (max.y - min.y + 1) as usize;
+    let offset = min;
+
+    let mut map = Map::new(width, height);
+    for vein in veins {
+        for point in vein.points() {
+            map[point - offset] = crate::Tile::Clay;
+        }
+    }
+
+    // AoC is upside down
+    map.flip_vertical()
+}
+
 #[derive(Debug, Clone)]
 struct Wavefront {
     position: Point,
@@ -95,9 +129,9 @@ struct Wavefront {
 /// Fill the map from an infinite water source located at the given x position and max `y`.
 fn fill_with_water(
     water_x: i32,
-    mut map: OffsetMap<Tile>,
+    mut map: Map,
     animation_path: Option<PathBuf>,
-) -> Result<OffsetMap<Tile>, Error> {
+) -> Result<Map, Error> {
     if water_x < map.low_x() || water_x > map.high_x() {
         return Err(Error::WaterSourceOutOfBounds);
     }
@@ -260,9 +294,9 @@ fn fill_with_water(
 // known wrong, too low: 1226
 pub fn part1(input: &Path, show_map: bool, animation_path: Option<PathBuf>) -> Result<(), Error> {
     let veins: Vec<Vein> = parse(input)?.collect();
-    let map = OffsetMap::new(&veins);
+    let map = make_map(&veins);
     let map = fill_with_water(WATER_X, map, animation_path)?;
-    let wet_tiles = map.iter().filter(|tile| tile.is_wet()).count();
+    let wet_tiles = map.iter().filter(|(_point, tile)| tile.is_wet()).count();
     println!("n wet tiles: {}", wet_tiles);
     if show_map {
         println!("{}", map);

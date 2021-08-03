@@ -48,7 +48,7 @@ impl Map {
     /// leaving only the immovable tiles of the map.
     pub fn units(&mut self) -> Units {
         let mut units = Vec::new();
-        self.0.for_each_point_mut(|tile, position| {
+        self.0.iter_mut().for_each(|(position, tile)| {
             if let Tile::Occupied(unit_type) = *tile {
                 *tile = Tile::Empty;
                 units.push(Unit::new(unit_type, position));

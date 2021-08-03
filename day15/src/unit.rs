@@ -75,7 +75,8 @@ impl Unit {
         positions: &UnitPositions,
     ) -> (bool, Option<Point>, Option<Point>) {
         debug_assert!(
-            !map.iter().any(|&tile| matches!(tile, Tile::Occupied(_))),
+            !map.iter()
+                .any(|(_point, &tile)| matches!(tile, Tile::Occupied(_))),
             "map must have only geography"
         );
         debug_assert!(

@@ -38,7 +38,7 @@ where
 
 pub fn part1(input: &Path) -> Result<(), Error> {
     let map = make_map(parse::<Claim>(input)?);
-    let n_overlaps = map.iter().filter(|&&used| used > 1).count();
+    let n_overlaps = map.iter().filter(|&(_, &used)| used > 1).count();
     println!("num overlaps: {}", n_overlaps);
     Ok(())
 }

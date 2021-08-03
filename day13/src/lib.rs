@@ -70,7 +70,7 @@ impl Map {
 
     fn extract_carts(&mut self) -> Carts {
         let mut carts = Vec::new();
-        self.0.for_each_point_mut(|track, position| {
+        for (position, track) in self.0.iter_mut() {
             if let Track::Cart(direction) = *track {
                 *track = match direction {
                     Direction::Right | Direction::Left => Track::Horizontal,
@@ -78,8 +78,11 @@ impl Map {
                 };
                 carts.push(Cart::new(direction, position));
             }
-        });
-        debug_assert!(!self.0.iter().any(|&track| matches!(track, Track::Cart(_))));
+        }
+        debug_assert!(!self
+            .0
+            .iter()
+            .any(|(_position, &track)| matches!(track, Track::Cart(_))));
 
         Carts { map: self, carts }
     }
