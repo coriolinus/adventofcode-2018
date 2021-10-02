@@ -270,6 +270,10 @@ fn fill_with_water(
                 // if we can flow down, we do not also flow sideways
                 continue;
             }
+        } else {
+            // if we've flowed down past the bottom of the map, we must not follow
+            // up by flowing sideways. It's assumed sand, not clay.
+            continue;
         }
 
         for sideways_direction in [Direction::Left, Direction::Right] {
