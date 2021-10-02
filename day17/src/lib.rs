@@ -193,64 +193,8 @@ fn fill_with_water(
             // we've made it back to a known state, no need to do any more work here
             Tile::WaterPassthrough => continue,
             Tile::Clay => {
-                // Clay is the complicated case, because when we've hit clay, we have to
-                // project backwards to determine whether or not to fill this level with water
-                if let Some(prev_point) = wavefront.prev_point {
-                    let direction: Direction = (wavefront.position - prev_point)
-                        .try_into()
-                        .expect("wavefront always propogates to orthogonal adjacent");
-                    debug_assert_ne!(direction, Direction::Up, "we never move upwards");
-                    debug_assert_ne!(direction, Direction::Down, "we never move down into clay");
-
-                    let backwards = direction.reverse();
-                    let (dx, dy) = backwards.deltas();
-                    let mut should_fill = false;
-                    // walk backwards through the points in this row to determine if this is a fill situation.
-                    for point in map.project(prev_point, dx, dy) {
-                        match map[point] {
-                            // if sand, the other back-projection will do the job later
-                            Tile::Sand => break,
-                            // if clay, then this is a basin and should fill
-                            Tile::Clay => {
-                                should_fill = true;
-                                break;
-                            }
-                            // passthroughs are uninteresting and common; do nothing
-                            Tile::WaterPassthrough => {}
-                            Tile::Water => {
-                                eprintln!("reached unexpected water at ({}, {})", point.x, point.y);
-                                break;
-                            }
-                        }
-                    }
-
-                    // if we should fill, do it all again
-                    if should_fill {
-                        let mut point = prev_point;
-                        while map.in_bounds(point) {
-                            match map[point] {
-                                Tile::Clay => break,
-                                Tile::WaterPassthrough => map[point] = Tile::Water,
-                                Tile::Sand => unreachable!("guaranteed by previous iteration"),
-                                Tile::Water => {
-                                    unreachable!("water propagation should never collide")
-                                }
-                            }
-                            point += backwards;
-                        }
-
-                        // the other consequence of filling a row is that we add children adjacent to the backtrack position
-                        if let Some(ref backtrack) = wavefront.backtrack {
-                            for direction in [Direction::Left, Direction::Right] {
-                                wavefronts.push_back(Wavefront {
-                                    position: backtrack.position + direction,
-                                    prev_point: Some(backtrack.position),
-                                    backtrack: backtrack.backtrack.clone(),
-                                });
-                            }
-                        }
-                    }
-                }
+                // Clay is complicated so we've factored it out
+                handle_clay(&mut map, &wavefront, &mut wavefronts);
 
                 // in any case, clay tiles have no normal successors
                 continue;
@@ -298,6 +242,69 @@ fn fill_with_water(
     }
 
     Ok(map)
+}
+
+// Clay is the complicated case, because when we've hit clay, we have to
+// project backwards to determine whether or not to fill this level with water
+fn handle_clay(map: &mut Map, wavefront: &Rc<Wavefront>, wavefronts: &mut VecDeque<Wavefront>) {
+    if let Some(prev_point) = wavefront.prev_point {
+        let direction: Direction = (wavefront.position - prev_point)
+            .try_into()
+            .expect("wavefront always propogates to orthogonal adjacent");
+        debug_assert_ne!(direction, Direction::Up, "we never move upwards");
+        debug_assert_ne!(direction, Direction::Down, "we never move down into clay");
+
+        let backwards = direction.reverse();
+        let (dx, dy) = backwards.deltas();
+        let mut should_fill = false;
+        // walk backwards through the points in this row to determine if this is a fill situation.
+        for point in map.project(prev_point, dx, dy) {
+            match map[point] {
+                // passthroughs are uninteresting and common; do nothing
+                Tile::WaterPassthrough => {}
+                // if sand, the other back-projection will do the job later
+                Tile::Sand => break,
+                // if clay, then this is a basin and should fill
+                Tile::Clay => {
+                    should_fill = true;
+                    break;
+                }
+                // we can reach water if, earlier this tick, the other side of the basin
+                // was detected, and filled this entire row with water. In that case,
+                // we don't need to do anything in particular.
+                Tile::Water => {
+                    break;
+                }
+            }
+        }
+
+        // if we should fill, do it all again
+        if should_fill {
+            let mut point = prev_point;
+            while map.in_bounds(point) {
+                match map[point] {
+                    Tile::Clay => break,
+                    Tile::WaterPassthrough => map[point] = Tile::Water,
+                    Tile::Sand => unreachable!("guaranteed by previous iteration"),
+                    Tile::Water => {
+                        unreachable!("water propagation should never collide")
+                    }
+                }
+                point += backwards;
+            }
+
+            // the other consequence of filling a row is that we add children adjacent to the backtrack position
+            if let Some(ref backtrack) = wavefront.backtrack {
+                for direction in [Direction::Left, Direction::Right] {
+                    wavefronts.push_back(Wavefront {
+                        position: backtrack.position + direction,
+                        prev_point: Some(backtrack.position),
+                        backtrack: backtrack.backtrack.clone(),
+                    });
+                }
+            }
+        }
+    }
 }
 
 // known wrong, too low: 1226
