@@ -13,7 +13,7 @@ use std::{
 };
 
 #[cfg(feature = "animate")]
-use std::time::Duration;
+use {aoclib::geometry::map::Style, std::time::Duration};
 
 const WATER_X: i32 = 500;
 
@@ -108,10 +108,10 @@ fn make_map(veins: &[Vein]) -> Map {
     let height = (max.y - min.y + 1) as usize;
     let offset = min;
 
-    let mut map = Map::new(width, height);
+    let mut map = Map::new_offset(offset, width, height);
     for vein in veins {
         for point in vein.points() {
-            map[point - offset] = crate::Tile::Clay;
+            map[point] = crate::Tile::Clay;
         }
     }
 
@@ -142,8 +142,8 @@ fn fill_with_water(
     }
 
     #[cfg(feature = "animate")]
-    let animation = animation_path.map(|path| {
-        map.prepare_animation(&path, Duration::from_millis(300))
+    let mut animation = animation_path.and_then(|path| {
+        map.prepare_animation(&path, Duration::from_millis(300), Style::Fill)
             .ok()
     });
 
@@ -151,7 +151,7 @@ fn fill_with_water(
         () => {
             #[cfg(feature = "animate")]
             if let Some(ref mut animation) = animation {
-                animation.write_frame(&map, false)?;
+                animation.write_frame(&map)?;
             }
         };
     }
@@ -288,6 +288,11 @@ fn fill_with_water(
         }
     }
 
+    // write final frames
+    for _ in 0..4 {
+        frame!();
+    }
+
     Ok(map)
 }
 
@@ -318,4 +323,7 @@ pub enum Error {
     WaterFlowedOverEdge,
     #[error("You set an animation path but did not compile with 'animation' feature")]
     MissingFeature,
+    #[cfg(feature = "animate")]
+    #[error("encoding animation")]
+    EncodingAnimation(#[from] aoclib::geometry::map::EncodingError),
 }
